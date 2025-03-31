@@ -349,7 +349,7 @@
 <div class="header">
         <div class="logo">
             <div class="logo-circle">BMS</div>
-            <h1>Battery Management System</h1>
+            <h1>Proxym</h1>
         </div>
         <div class="user-info">
             <span>Balance: 0.00 (Coins)</span>
@@ -517,354 +517,383 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
     <script>
-        // Variable pour stocker la liste des batteries (sera chargée depuis l'API)
-        let batteryList = [];
+      // Variable pour stocker la liste des batteries (sera chargée depuis l'API)
+let batteryList = [];
+
+// Current selected battery
+let currentBatteryId = ""; // Sera initialisé au chargement
+let batteryChart = null;
+
+// Initialize the app
+document.addEventListener('DOMContentLoaded', function() {
+    // Récupérer l'ID de la batterie sélectionnée depuis l'URL
+    const urlParams = new URLSearchParams(window.location.search);
+    const selectedBattery = urlParams.get('battery');
+    
+    if (selectedBattery) {
+        currentBatteryId = selectedBattery;
+        document.getElementById('search-input').value = selectedBattery;
+    }
+    
+    // Charger la liste des batteries depuis l'API
+    fetchBatteryList().then(() => {
+        // Si aucune batterie n'est sélectionnée mais que la liste n'est pas vide, 
+        // sélectionner la première batterie
+        if (!currentBatteryId && batteryList.length > 0) {
+            currentBatteryId = batteryList[0].id;
+            document.getElementById('search-input').value = currentBatteryId;
+        }
         
-        // Current selected battery
-        let currentBatteryId = "613881628046";
-        let batteryChart = null;
+        initializeSidebar();
+        setupEventListeners();
+        
+        if (currentBatteryId) {
+            loadBatteryData(currentBatteryId);
+            // Set interval to periodically update data
+            setInterval(() => loadBatteryData(currentBatteryId, true), 5000);
+        }
+    }).catch(error => {
+        console.error('Erreur lors du chargement des batteries:', error);
+    });
+});
 
-        // Initialize the app
-        document.addEventListener('DOMContentLoaded', function() {
-            // Charger la liste des batteries depuis l'API
-            fetchBatteryList().then(() => {
-                initializeSidebar();
-                setupEventListeners();
-                loadBatteryData(currentBatteryId);
-                // Set interval to periodically update data
-                setInterval(() => loadBatteryData(currentBatteryId, true), 5000);
-            }).catch(error => {
-                console.error('Erreur lors du chargement des batteries:', error);
-            });
+// Initialize the sidebar with battery list
+function initializeSidebar() {
+    const sidebar = document.getElementById('sidebar');
+    // Clear sidebar except the home item
+    const homeItem = sidebar.querySelector('[data-role="home"]');
+    sidebar.innerHTML = '';
+    sidebar.appendChild(homeItem);
+    
+    // Add battery items
+    batteryList.forEach(battery => {
+        const item = document.createElement('div');
+        item.className = `sidebar-item ${battery.id === currentBatteryId ? 'active' : ''}`;
+        item.setAttribute('data-battery-id', battery.id);
+        item.innerHTML = `<i>🔋</i> ${battery.id}`;
+        sidebar.appendChild(item);
+    });
+}
+
+// Set up event listeners
+function setupEventListeners() {
+    // Sidebar item clicks
+    document.getElementById('sidebar').addEventListener('click', function(e) {
+        const item = e.target.closest('.sidebar-item');
+        if (!item) return;
+        
+        // Si c'est l'élément "Liste des batteries", retourner à la page des associations
+        if (item.getAttribute('data-role') === 'home') {
+            window.location.href = '/associations/batterie/user';
+            return;
+        }
+        
+        // Set all items as inactive
+        document.querySelectorAll('.sidebar-item').forEach(el => {
+            el.classList.remove('active');
         });
-
-        // Initialize the sidebar with battery list
-        function initializeSidebar() {
-            const sidebar = document.getElementById('sidebar');
-            // Clear sidebar except the home item
-            const homeItem = sidebar.querySelector('[data-role="home"]');
-            sidebar.innerHTML = '';
-            sidebar.appendChild(homeItem);
+        
+        // Set clicked item as active
+        item.classList.add('active');
+        
+        // If it's a battery item, load its data
+        const batteryId = item.getAttribute('data-battery-id');
+        if (batteryId) {
+            currentBatteryId = batteryId;
+            document.getElementById('search-input').value = batteryId;
+            loadBatteryData(batteryId);
             
-            // Add battery items
-            batteryList.forEach(battery => {
-                const item = document.createElement('div');
-                item.className = `sidebar-item ${battery.id === currentBatteryId ? 'active' : ''}`;
-                item.setAttribute('data-battery-id', battery.id);
-                item.textContent = ` ${battery.id}`;
-                sidebar.appendChild(item);
-            });
+            // Mettre à jour l'URL sans recharger la page
+            const url = new URL(window.location);
+            url.searchParams.set('battery', batteryId);
+            window.history.pushState({}, '', url);
         }
-
-        // Set up event listeners
-        function setupEventListeners() {
-            // Sidebar item clicks
-            document.getElementById('sidebar').addEventListener('click', function(e) {
-                const item = e.target.closest('.sidebar-item');
-                if (!item) return;
-                
-                // Set all items as inactive
-                document.querySelectorAll('.sidebar-item').forEach(el => {
-                    el.classList.remove('active');
-                });
-                
-                // Set clicked item as active
-                item.classList.add('active');
-                
-                // If it's a battery item, load its data
-                const batteryId = item.getAttribute('data-battery-id');
-                if (batteryId) {
-                    currentBatteryId = batteryId;
-                    document.getElementById('search-input').value = batteryId;
-                    loadBatteryData(batteryId);
+    });
+    
+    // Search button click
+    document.getElementById('search-btn').addEventListener('click', function() {
+        const batteryId = document.getElementById('search-input').value.trim();
+        // Check if battery exists
+        const exists = batteryList.some(b => b.id === batteryId);
+        if (exists) {
+            currentBatteryId = batteryId;
+            loadBatteryData(batteryId);
+            // Update sidebar active state
+            document.querySelectorAll('.sidebar-item').forEach(el => {
+                el.classList.remove('active');
+                if (el.getAttribute('data-battery-id') === batteryId) {
+                    el.classList.add('active');
                 }
             });
             
-            // Search button click
-            document.getElementById('search-btn').addEventListener('click', function() {
-                const batteryId = document.getElementById('search-input').value.trim();
-                // Check if battery exists
-                const exists = batteryList.some(b => b.id === batteryId);
-                if (exists) {
-                    currentBatteryId = batteryId;
-                    loadBatteryData(batteryId);
-                    // Update sidebar active state
-                    document.querySelectorAll('.sidebar-item').forEach(el => {
-                        el.classList.remove('active');
-                        if (el.getAttribute('data-battery-id') === batteryId) {
-                            el.classList.add('active');
-                        }
-                    });
-                } else {
-                    alert('Battery ID not found!');
-                }
-            });
-            
-            // Read button click (same as search but could have different functionality)
-            document.getElementById('read-btn').addEventListener('click', function() {
-                const batteryId = document.getElementById('search-input').value.trim();
-                if (batteryList.some(b => b.id === batteryId)) {
-                    currentBatteryId = batteryId;
-                    loadBatteryData(batteryId);
-                } else {
-                    alert('Battery ID not found!');
-                }
-            });
-            
-            // Tab clicks
-            document.querySelectorAll('.tab').forEach(tab => {
-                tab.addEventListener('click', function() {
-                    document.querySelector('.tab.active').classList.remove('active');
-                    this.classList.add('active');
-                });
-            });
+            // Mettre à jour l'URL sans recharger la page
+            const url = new URL(window.location);
+            url.searchParams.set('battery', batteryId);
+            window.history.pushState({}, '', url);
+        } else {
+            alert('Battery ID not found!');
         }
-
-        // Load battery data from API
-        function loadBatteryData(batteryId, isUpdate = false) {
-            // Real AJAX call to the backend
-            fetchBatteryData(batteryId).then(data => {
-                updateBatteryUI(data);
-            }).catch(error => {
-                console.error('Error loading battery data:', error);
-            });
+    });
+    
+    // Read button click
+    document.getElementById('read-btn').addEventListener('click', function() {
+        const batteryId = document.getElementById('search-input').value.trim();
+        if (batteryList.some(b => b.id === batteryId)) {
+            currentBatteryId = batteryId;
+            loadBatteryData(batteryId);
+            
+            // Mettre à jour l'URL sans recharger la page
+            const url = new URL(window.location);
+            url.searchParams.set('battery', batteryId);
+            window.history.pushState({}, '', url);
+        } else {
+            alert('Battery ID not found!');
         }
+    });
+    
+    // Tab clicks
+    document.querySelectorAll('.tab').forEach(tab => {
+        tab.addEventListener('click', function() {
+            document.querySelector('.tab.active').classList.remove('active');
+            this.classList.add('active');
+        });
+    });
+}
 
-        // Update the UI with battery data
-        function updateBatteryUI(data) {
-            // Update header and device info
-            document.getElementById('header-battery-id').textContent = `ID: ${data.id}`;
-            document.getElementById('device-id').textContent = `ID: ${data.id}`;
-            document.getElementById('device-status').textContent = `Device ${data.status}`;
-            document.getElementById('device-update-time').textContent = `Update time: ${data.updatedAt}`;
-            
-            // Update SOC circle
-            const socCircle = document.getElementById('soc-circle');
-            socCircle.style.setProperty('--percentage', data.soc);
-            document.getElementById('soc-value').textContent = `${data.soc}%`;
-            
-            // Update battery status info
-            document.getElementById('battery-status').textContent = data.batteryStatus;
-            document.getElementById('soe').textContent = data.soe;
-            document.getElementById('cycles').textContent = data.cycles;
-            
-            // Update gauges
-            // Voltage gauge (scale to 0-100% of expected range 0-100V)
-            const voltageOffset = 339 - (339 * (data.voltage / 100));
-            document.getElementById('voltage-gauge').setAttribute('stroke-dashoffset', voltageOffset);
-            document.getElementById('voltage-value').textContent = data.voltage;
-            
-            // Current gauge (scale to 0-100% of expected range 0-1A)
-            const currentOffset = 339 - (339 * (data.current / 1));
-            document.getElementById('current-gauge').setAttribute('stroke-dashoffset', currentOffset);
-            document.getElementById('current-value').textContent = data.current;
-            
-            // Power gauge (scale to 0-100% of expected range 0-0.1kW)
-            const powerOffset = 339 - (339 * (data.power / 0.1));
-            document.getElementById('power-gauge').setAttribute('stroke-dashoffset', powerOffset);
-            document.getElementById('power-value').textContent = data.power;
-            
-            // Update battery parameters
-            document.getElementById('battery-type').textContent = data.type;
-            document.getElementById('battery-strings').textContent = data.strings;
-            document.getElementById('nominal-capacity').textContent = data.nominalCapacity;
-            document.getElementById('rated-current').textContent = data.ratedCurrent;
-            
-            document.getElementById('charge-switch').textContent = data.chargeSwitch;
-            document.getElementById('discharge-switch').textContent = data.dischargeSwitch;
-            document.getElementById('charge-current').textContent = data.chargeCurrent;
-            document.getElementById('discharge-current').textContent = data.dischargeCurrent;
-            
-            document.getElementById('battery-temp1').textContent = `${data.temps[0].toFixed(1)}°C`;
-            document.getElementById('battery-temp2').textContent = `${data.temps[1].toFixed(1)}°C`;
-            document.getElementById('battery-temp3').textContent = `${data.temps[2].toFixed(1)}°C`;
-            document.getElementById('battery-temp4').textContent = `${data.temps[3].toFixed(1)}°C`;
-            
-            // Update cell voltage stats
-            document.getElementById('max-volt').textContent = data.maxVolt;
-            document.getElementById('min-volt').textContent = data.minVolt;
-            document.getElementById('max-diff').textContent = data.maxDiff;
-            
-            // Update cell voltage grid
-            const cellGrid = document.getElementById('cell-grid');
-            cellGrid.innerHTML = '';
-            
-            data.cellVoltages.forEach(cell => {
-                const cellElement = document.createElement('div');
-                cellElement.className = `cell ${cell.status}`;
-                cellElement.innerHTML = `
-                    <div class="cell-number">#${cell.number}</div>
-                    <div class="cell-voltage">${cell.voltage}V</div>
-                `;
-                cellGrid.appendChild(cellElement);
-            });
-            
-            // Update chart
-            updateBatteryChart(data.chartData);
-        }
+// Load battery data from API
+function loadBatteryData(batteryId, isUpdate = false) {
+    // Real AJAX call to the backend
+    fetchBatteryData(batteryId).then(data => {
+        updateBatteryUI(data);
+    }).catch(error => {
+        console.error('Error loading battery data:', error);
+    });
+}
 
-        // Update the battery chart
-        function updateBatteryChart(chartData) {
-            const ctx = document.getElementById('batteryChart').getContext('2d');
-            
-            // Destroy existing chart if it exists
-            if (batteryChart) {
-                batteryChart.destroy();
-            }
-            
-            // Create new chart
-            batteryChart = new Chart(ctx, {
-                type: 'line',
-                data: {
-                    labels: chartData.timeLabels,
-                    datasets: [
-                        {
-                            label: 'Battery Voltage (V)',
-                            data: chartData.batteryVoltage,
-                            borderColor: '#3498db',
-                            backgroundColor: 'rgba(52, 152, 219, 0.1)',
-                            tension: 0.3,
-                            yAxisID: 'y'
-                        },
-                        {
-                            label: 'Remaining Capacity (%)',
-                            data: chartData.remainingCapacity,
-                            borderColor: '#DCDB32',
-                            backgroundColor: 'rgba(220, 219, 50, 0.1)',
-                            tension: 0.3,
-                            yAxisID: 'y'
-                        },
-                        {
-                            label: 'Discharge Current (A)',
-                            data: chartData.dischargeCurrent,
-                            borderColor: '#e74c3c',
-                            backgroundColor: 'rgba(231, 76, 60, 0.1)',
-                            tension: 0.3,
-                            yAxisID: 'y1'
-                        },
-                        {
-                            label: 'Temperature (°C)',
-                            data: chartData.temperature,
-                            borderColor: '#f39c12',
-                            backgroundColor: 'rgba(243, 156, 18, 0.1)',
-                            tension: 0.3,
-                            yAxisID: 'y2'
-                        }
-                    ]
+// Update the UI with battery data
+function updateBatteryUI(data) {
+    // Update header and device info
+    document.getElementById('header-battery-id').textContent = `ID: ${data.id}`;
+    document.getElementById('device-id').textContent = `ID: ${data.id}`;
+    document.getElementById('device-status').textContent = `Device ${data.status}`;
+    document.getElementById('device-update-time').textContent = `Update time: ${data.updatedAt}`;
+    
+    // Update SOC circle
+    const socCircle = document.getElementById('soc-circle');
+    socCircle.style.setProperty('--percentage', data.soc);
+    document.getElementById('soc-value').textContent = `${data.soc}%`;
+    
+    // Animation for charging/discharging status
+    socCircle.classList.remove('rotate-charging', 'rotate-discharging');
+    if (data.batteryStatus === 'Charging') {
+        socCircle.classList.add('rotate-charging');
+    } else if (data.batteryStatus === 'Discharging') {
+        socCircle.classList.add('rotate-discharging');
+    }
+    
+    // Update battery status info with color
+    const batteryStatusElement = document.getElementById('battery-status');
+    batteryStatusElement.textContent = data.batteryStatus;
+    batteryStatusElement.style.color = getStatusColor(data.batteryStatus);
+    
+    document.getElementById('soe').textContent = data.soe;
+    document.getElementById('cycles').textContent = data.cycles;
+    
+    // Update gauges
+    // Voltage gauge (scale to 0-100% of expected range 0-100V)
+    const voltageOffset = 339 - (339 * (data.voltage / 100));
+    document.getElementById('voltage-gauge').setAttribute('stroke-dashoffset', voltageOffset);
+    document.getElementById('voltage-value').textContent = data.voltage.toFixed(1);
+    
+    // Current gauge (scale to 0-100% of expected range 0-1A)
+    const currentOffset = 339 - (339 * (Math.min(data.current, 1) / 1));
+    document.getElementById('current-gauge').setAttribute('stroke-dashoffset', currentOffset);
+    document.getElementById('current-value').textContent = data.current.toFixed(3);
+    
+    // Power gauge (scale to 0-100% of expected range 0-0.1kW)
+    const powerOffset = 339 - (339 * (Math.min(data.power, 0.1) / 0.1));
+    document.getElementById('power-gauge').setAttribute('stroke-dashoffset', powerOffset);
+    document.getElementById('power-value').textContent = data.power.toFixed(3);
+    
+    // Update battery parameters
+    document.getElementById('battery-type').textContent = data.type;
+    document.getElementById('battery-strings').textContent = data.strings;
+    document.getElementById('nominal-capacity').textContent = data.nominalCapacity;
+    document.getElementById('rated-current').textContent = data.ratedCurrent;
+    
+    document.getElementById('charge-switch').textContent = data.chargeSwitch;
+    document.getElementById('discharge-switch').textContent = data.dischargeSwitch;
+    document.getElementById('charge-current').textContent = data.chargeCurrent;
+    document.getElementById('discharge-current').textContent = data.dischargeCurrent;
+    
+    // Mettre à jour les températures
+    for (let i = 0; i < 4; i++) {
+        const temp = data.temps[i] !== undefined ? data.temps[i] : 0;
+        document.getElementById(`battery-temp${i+1}`).textContent = `${temp.toFixed(1)}°C`;
+    }
+    
+    // Update cell voltage stats
+    document.getElementById('max-volt').textContent = data.maxVolt.toFixed(3);
+    document.getElementById('min-volt').textContent = data.minVolt.toFixed(3);
+    document.getElementById('max-diff').textContent = data.maxDiff.toFixed(3);
+    
+    // Update cell voltage grid
+    const cellGrid = document.getElementById('cell-grid');
+    cellGrid.innerHTML = '';
+    
+    data.cellVoltages.forEach(cell => {
+        const cellElement = document.createElement('div');
+        cellElement.className = `cell ${cell.status}`;
+        cellElement.innerHTML = `
+            <div class="cell-number">#${cell.number}</div>
+            <div class="cell-voltage">${cell.voltage.toFixed(3)}V</div>
+        `;
+        cellGrid.appendChild(cellElement);
+    });
+    
+    // Update chart
+    updateBatteryChart(data.chartData);
+}
+
+// Helper function to get status color
+function getStatusColor(status) {
+    switch(status) {
+        case 'Charging':
+            return '#2980b9'; // Blue
+        case 'Discharging':
+            return '#27ae60'; // Green
+        case 'Idle':
+            return '#f39c12'; // Orange
+        default:
+            return '#7f8c8d'; // Gray
+    }
+}
+
+// Update the battery chart
+function updateBatteryChart(chartData) {
+    const ctx = document.getElementById('batteryChart').getContext('2d');
+    
+    // Destroy existing chart if it exists
+    if (batteryChart) {
+        batteryChart.destroy();
+    }
+    
+    // Create new chart
+    batteryChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: chartData.timeLabels,
+            datasets: [
+                {
+                    label: 'Battery Voltage (V)',
+                    data: chartData.batteryVoltage,
+                    borderColor: '#3498db',
+                    backgroundColor: 'rgba(52, 152, 219, 0.1)',
+                    tension: 0.3,
+                    yAxisID: 'y'
                 },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    interaction: {
-                        mode: 'index',
-                        intersect: false,
+                {
+                    label: 'Remaining Capacity (%)',
+                    data: chartData.remainingCapacity,
+                    borderColor: '#DCDB32',
+                    backgroundColor: 'rgba(220, 219, 50, 0.1)',
+                    tension: 0.3,
+                    yAxisID: 'y'
+                },
+                {
+                    label: 'Discharge Current (A)',
+                    data: chartData.dischargeCurrent,
+                    borderColor: '#e74c3c',
+                    backgroundColor: 'rgba(231, 76, 60, 0.1)',
+                    tension: 0.3,
+                    yAxisID: 'y1'
+                },
+                {
+                    label: 'Temperature (°C)',
+                    data: chartData.temperature,
+                    borderColor: '#f39c12',
+                    backgroundColor: 'rgba(243, 156, 18, 0.1)',
+                    tension: 0.3,
+                    yAxisID: 'y2'
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: {
+                mode: 'index',
+                intersect: false,
+            },
+            scales: {
+                y: {
+                    type: 'linear',
+                    display: true,
+                    position: 'left',
+                    title: {
+                        display: true,
+                        text: 'Voltage (V) / Capacity (%)'
                     },
-                    scales: {
-                        y: {
-                            type: 'linear',
-                            display: true,
-                            position: 'left',
-                            title: {
-                                display: true,
-                                text: 'Voltage (V) / Capacity (%)'
-                            },
-                            min: 0,
-                            max: 100
-                        },
-                        y1: {
-                            type: 'linear',
-                            display: true,
-                            position: 'right',
-                            title: {
-                                display: true,
-                                text: 'Current (A)'
-                            },
-                            min: 0,
-                            max: 1,
-                            grid: {
-                                drawOnChartArea: false,
-                            }
-                        },
-                        y2: {
-                            type: 'linear',
-                            display: true,
-                            position: 'right',
-                            title: {
-                                display: true,
-                                text: 'Temperature (°C)'
-                            },
-                            min: 25,
-                            max: 40,
-                            grid: {
-                                drawOnChartArea: false,
-                            }
-                        }
+                    min: 0,
+                    max: 100
+                },
+                y1: {
+                    type: 'linear',
+                    display: true,
+                    position: 'right',
+                    title: {
+                        display: true,
+                        text: 'Current (A)'
+                    },
+                    min: 0,
+                    max: Math.max(...chartData.dischargeCurrent, 1) * 1.2,
+                    grid: {
+                        drawOnChartArea: false,
+                    }
+                },
+                y2: {
+                    type: 'linear',
+                    display: true,
+                    position: 'right',
+                    title: {
+                        display: true,
+                        text: 'Temperature (°C)'
+                    },
+                    min: Math.min(...chartData.temperature) * 0.9,
+                    max: Math.max(...chartData.temperature) * 1.1,
+                    grid: {
+                        drawOnChartArea: false,
                     }
                 }
-            });
-        }
-
-        // AJAX functions for API communication
-        function fetchBatteryData(batteryId) {
-            return fetch(`/api/bms/battery/${batteryId}`)
-                .then(response => {
-                    if (!response.ok) {
-                        throw new Error('Network response was not ok');
-                    }
-                    return response.json();
-                });
-        }
-
-        function fetchBatteryList() {
-            return fetch('/api/bms/batteries')
-                .then(response => {
-                    if (!response.ok) {
-                        throw new Error('Network response was not ok');
-                    }
-                    return response.json();
-                })
-                .then(data => {
-                    batteryList = data;
-                    return data;
-                });
-        }
-
-        // Helper functions pour les graphiques restent utiles même avec l'API réelle
-        function getRandomValue(min, max) {
-            return Math.random() * (max - min) + min;
-        }
-
-        function getRandomInt(min, max) {
-            min = Math.ceil(min);
-            max = Math.floor(max);
-            return Math.floor(Math.random() * (max - min + 1)) + min;
-        }
-
-        function generateRandomDataArray(min, max, length) {
-            const arr = [];
-            for (let i = 0; i < length; i++) {
-                arr.push(parseFloat(getRandomValue(min, max).toFixed(1)));
             }
-            return arr;
         }
+    });
+}
 
-        function generateDecreasingArray(start, end, length) {
-            const arr = [];
-            const step = (start - end) / (length - 1);
-            for (let i = 0; i < length; i++) {
-                arr.push(parseFloat((start - step * i).toFixed(1)));
+// AJAX functions for API communication
+function fetchBatteryData(batteryId) {
+    return fetch(`/api/bms/battery/${batteryId}`)
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('Network response was not ok');
             }
-            return arr;
-        }
+            return response.json();
+        });
+}
 
-        function generateIncreasingArray(start, end, length) {
-            const arr = [];
-            const step = (end - start) / (length - 1);
-            for (let i = 0; i < length; i++) {
-                arr.push(parseFloat((start + step * i).toFixed(3)));
+function fetchBatteryList() {
+    return fetch('/api/bms/batteries')
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('Network response was not ok');
             }
-            return arr;
-        }
+            return response.json();
+        })
+        .then(data => {
+            batteryList = data;
+            return data;
+        });
+}
     </script>
 </body>
 </html>

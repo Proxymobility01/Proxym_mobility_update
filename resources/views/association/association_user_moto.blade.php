@@ -1,9 +1,6 @@
 @extends('layouts.app')
 
 <style>
-
-
-
 /* Couleurs d'application */
 :root {
     --primary: #DCDB32;
@@ -228,7 +225,8 @@ thead {
     background-color: var(--tertiary);
 }
 
-th, td {
+th,
+td {
     padding: 12px 15px;
     text-align: left;
     border-bottom: 1px solid #ddd;
@@ -438,10 +436,14 @@ tr:hover {
         <h2>{{ $pageTitle }}</h2>
         <div id="date" class="date"></div>
     </div>
+ <!-- Onglets de navigation -->
+ <div class="nav-tabs">
+        <div class="nav-tab" data-tab="moto-user">Associations Moto-Utilisateur</div>
+        <div class="nav-tab active" data-tab="battery-user">Associations Batterie-Utilisateur</div>
+    </div>
 
-
-     <!-- Barre de recherche et ajout -->
-     <div class="search-bar">
+    <!-- Barre de recherche et ajout -->
+    <div class="search-bar">
         <div class="search-group">
             <input type="text" id="search-association" placeholder="Rechercher une association...">
             <button type="submit" class="search-btn">
@@ -493,7 +495,7 @@ tr:hover {
         </div>
     </div>
 
-   
+
 
     <!-- Tableau des associations -->
     <div class="table-container">
@@ -516,7 +518,7 @@ tr:hover {
                     <td>{{ $association->motosValide->moto_unique_id }}</td>
                     <td>{{ $association->motosValide->model }}</td>
                     <td>{{ \Carbon\Carbon::parse($association->created_at)->format('d/m/Y') }}</td>
-                    <td>
+                    <td style="display: flex;">
                         <button class="action-btn edit-association" title="Modifier l'association">
                             <i class="fas fa-edit"></i>
                         </button>
@@ -543,7 +545,7 @@ tr:hover {
                 @csrf
                 <input type="hidden" id="edit-association-id" name="id">
                 <input type="hidden" id="form-method" name="_method" value="POST">
-                
+
                 <div class="association-container">
                     <!-- Section Utilisateurs -->
                     <div class="association-column">
@@ -554,7 +556,8 @@ tr:hover {
                         <div class="checkbox-list" id="users-list">
                             @foreach ($users as $user)
                             <div class="checkbox-item">
-                                <input type="checkbox" name="user_unique_id[]" id="user-{{ $user->user_unique_id }}" value="{{ $user->user_unique_id }}" class="user-checkbox">
+                                <input type="checkbox" name="user_unique_id[]" id="user-{{ $user->user_unique_id }}"
+                                    value="{{ $user->user_unique_id }}" class="user-checkbox">
                                 <label for="user-{{ $user->user_unique_id }}">
                                     {{ $user->nom }} {{ $user->prenom }} ({{ $user->user_unique_id }})
                                 </label>
@@ -562,7 +565,7 @@ tr:hover {
                             @endforeach
                         </div>
                     </div>
-                    
+
                     <!-- Section Motos -->
                     <div class="association-column">
                         <h3>Liste des Motos</h3>
@@ -572,7 +575,8 @@ tr:hover {
                         <div class="checkbox-list" id="motos-list">
                             @foreach ($motos as $moto)
                             <div class="checkbox-item">
-                                <input type="checkbox" name="moto_unique_id[]" id="moto-{{ $moto->moto_unique_id }}" value="{{ $moto->moto_unique_id }}" class="moto-checkbox">
+                                <input type="checkbox" name="moto_unique_id[]" id="moto-{{ $moto->moto_unique_id }}"
+                                    value="{{ $moto->moto_unique_id }}" class="moto-checkbox">
                                 <label for="moto-{{ $moto->moto_unique_id }}">
                                     {{ $moto->model }} ({{ $moto->moto_unique_id }})
                                 </label>
@@ -598,7 +602,8 @@ tr:hover {
             <span class="close-modal">&times;</span>
         </div>
         <div class="modal-body">
-            <p>Cette moto est déjà associée à un ou plusieurs utilisateurs. Voulez-vous l'associer à cet utilisateur supplémentaire?</p>
+            <p>Cette moto est déjà associée à un ou plusieurs utilisateurs. Voulez-vous l'associer à cet utilisateur
+                supplémentaire?</p>
             <form id="confirm-association-form" method="POST" action="{{ route('associations.confirm') }}">
                 @csrf
                 <input type="hidden" id="confirm-moto-id" name="moto_id">
@@ -637,7 +642,7 @@ tr:hover {
     </div>
 </div>
 <script>
- document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', function() {
     // ------------------------------------------------------------
     // Initialisation et variables
     // ------------------------------------------------------------
@@ -648,11 +653,11 @@ tr:hover {
     const confirmAssociationModal = document.getElementById('confirm-association-modal');
     const deleteAssociationModal = document.getElementById('delete-association-modal');
     const associationsTableBody = document.getElementById('associations-table-body');
-    
+
     // Recherche dans les listes de checkboxes
     const searchUserInput = document.getElementById('search-user');
     const searchMotoInput = document.getElementById('search-moto');
-    
+
     // Afficher la date actuelle
     const dateElement = document.getElementById('date');
     const today = new Date();
@@ -666,24 +671,25 @@ tr:hover {
         const userCheckboxes = document.querySelectorAll('.user-checkbox');
         userCheckboxes.forEach(checkbox => {
             const checkboxItem = checkbox.closest('.checkbox-item');
-            
+
             // Appliquer la classe 'selected' si déjà sélectionné au chargement
             if (checkbox.checked) {
                 checkboxItem.classList.add('selected');
             }
-            
+
             // Gérer le changement d'état du checkbox
             checkbox.addEventListener('change', function() {
                 // Ajouter/Supprimer la classe 'selected' en fonction de l'état
                 if (this.checked) {
                     checkboxItem.classList.add('selected');
-                    
+
                     // Si en mode édition (sélection unique), désélectionner les autres
                     if (document.getElementById('form-method').value === 'PUT') {
                         userCheckboxes.forEach(cb => {
                             if (cb !== checkbox && cb.checked) {
                                 cb.checked = false;
-                                cb.closest('.checkbox-item').classList.remove('selected');
+                                cb.closest('.checkbox-item').classList.remove(
+                                    'selected');
                             }
                         });
                     }
@@ -691,42 +697,43 @@ tr:hover {
                     checkboxItem.classList.remove('selected');
                 }
             });
-            
+
             // Permettre de cliquer sur l'élément entier pour cocher/décocher
             checkboxItem.addEventListener('click', function(e) {
                 // Vérifier que le clic n'est pas sur le checkbox lui-même
                 if (e.target !== checkbox && e.target !== checkbox.nextElementSibling) {
                     checkbox.checked = !checkbox.checked;
-                    
+
                     // Déclencher l'événement 'change' pour appliquer les styles
                     const changeEvent = new Event('change');
                     checkbox.dispatchEvent(changeEvent);
                 }
             });
         });
-        
+
         // Gérer le clic sur les checkboxes des motos
         const motoCheckboxes = document.querySelectorAll('.moto-checkbox');
         motoCheckboxes.forEach(checkbox => {
             const checkboxItem = checkbox.closest('.checkbox-item');
-            
+
             // Appliquer la classe 'selected' si déjà sélectionné au chargement
             if (checkbox.checked) {
                 checkboxItem.classList.add('selected');
             }
-            
+
             // Gérer le changement d'état du checkbox
             checkbox.addEventListener('change', function() {
                 // Ajouter/Supprimer la classe 'selected' en fonction de l'état
                 if (this.checked) {
                     checkboxItem.classList.add('selected');
-                    
+
                     // Si en mode édition (sélection unique), désélectionner les autres
                     if (document.getElementById('form-method').value === 'PUT') {
                         motoCheckboxes.forEach(cb => {
                             if (cb !== checkbox && cb.checked) {
                                 cb.checked = false;
-                                cb.closest('.checkbox-item').classList.remove('selected');
+                                cb.closest('.checkbox-item').classList.remove(
+                                    'selected');
                             }
                         });
                     }
@@ -734,13 +741,13 @@ tr:hover {
                     checkboxItem.classList.remove('selected');
                 }
             });
-            
+
             // Permettre de cliquer sur l'élément entier pour cocher/décocher
             checkboxItem.addEventListener('click', function(e) {
                 // Vérifier que le clic n'est pas sur le checkbox lui-même
                 if (e.target !== checkbox && e.target !== checkbox.nextElementSibling) {
                     checkbox.checked = !checkbox.checked;
-                    
+
                     // Déclencher l'événement 'change' pour appliquer les styles
                     const changeEvent = new Event('change');
                     checkbox.dispatchEvent(changeEvent);
@@ -759,28 +766,29 @@ tr:hover {
             const checkbox = item.querySelector('input[type="checkbox"]');
             if (checkbox) checkbox.checked = false;
         });
-        
+
         // Réinitialiser le formulaire
         document.getElementById('association-form').reset();
         document.getElementById('form-method').value = 'POST';
         document.getElementById('edit-association-id').value = '';
-        
+
         // Mettre à jour le titre
         document.getElementById('modal-title').textContent = 'Associer Moto & Utilisateur';
-        document.getElementById('association-form').action = "{{ route('associations.associerMotoAUtilisateurs') }}";
-        
+        document.getElementById('association-form').action =
+            "{{ route('associations.associerMotoAUtilisateurs') }}";
+
         // Permettre la sélection multiple
         enableMultipleSelection(true);
-        
+
         // Réinitialiser les champs de recherche
         if (searchUserInput) searchUserInput.value = '';
         if (searchMotoInput) searchMotoInput.value = '';
-        
+
         // Afficher tous les éléments qui pourraient avoir été masqués
         document.querySelectorAll('#users-list .checkbox-item, #motos-list .checkbox-item').forEach(item => {
             item.style.display = '';
         });
-        
+
         // Afficher la modale
         associationModal.classList.add('active');
         document.body.style.overflow = 'hidden';
@@ -793,43 +801,43 @@ tr:hover {
             const checkbox = item.querySelector('input[type="checkbox"]');
             if (checkbox) checkbox.checked = false;
         });
-        
+
         const id = row.dataset.id;
         const userId = row.querySelector('td:nth-child(1)').textContent;
         const motoId = row.querySelector('td:nth-child(3)').textContent;
-        
+
         // Réinitialiser le formulaire
         document.getElementById('association-form').reset();
         document.getElementById('form-method').value = 'PUT';
         document.getElementById('edit-association-id').value = id;
-        
+
         // Mettre à jour le titre et l'action du formulaire
         document.getElementById('modal-title').textContent = 'Modifier l\'association';
         document.getElementById('association-form').action = `/associations/${id}`;
-        
+
         // Limiter à une seule sélection
         enableMultipleSelection(false);
-        
+
         // Réinitialiser les champs de recherche
         if (searchUserInput) searchUserInput.value = '';
         if (searchMotoInput) searchMotoInput.value = '';
-        
+
         // Afficher tous les éléments qui pourraient avoir été masqués
         document.querySelectorAll('#users-list .checkbox-item, #motos-list .checkbox-item').forEach(item => {
             item.style.display = '';
         });
-        
+
         // Après avoir coché les checkboxes, mettre à jour les styles
         if (document.getElementById(`user-${userId}`)) {
             document.getElementById(`user-${userId}`).checked = true;
             document.getElementById(`user-${userId}`).closest('.checkbox-item').classList.add('selected');
         }
-        
+
         if (document.getElementById(`moto-${motoId}`)) {
             document.getElementById(`moto-${motoId}`).checked = true;
             document.getElementById(`moto-${motoId}`).closest('.checkbox-item').classList.add('selected');
         }
-        
+
         // Afficher la modale
         associationModal.classList.add('active');
         document.body.style.overflow = 'hidden';
@@ -846,15 +854,15 @@ tr:hover {
         const userName = row.querySelector('td:nth-child(2)').textContent;
         const motoId = row.querySelector('td:nth-child(3)').textContent;
         const motoModel = row.querySelector('td:nth-child(4)').textContent;
-        
+
         // Configurer la modale
         document.getElementById('delete-user-name').textContent = userName;
         document.getElementById('delete-moto-id').textContent = `${motoModel} (${motoId})`;
-        
+
         // Modifier l'action du formulaire
         const form = document.getElementById('delete-association-form');
         form.action = `/associations/${id}`;
-        
+
         deleteAssociationModal.classList.add('active');
     }
 
@@ -872,7 +880,7 @@ tr:hover {
             const newItem = item.cloneNode(true);
             item.parentNode.replaceChild(newItem, item);
         });
-        
+
         // Réinitialiser les événements
         initCheckboxEvents();
     }
@@ -883,7 +891,7 @@ tr:hover {
     searchUserInput.addEventListener('input', function() {
         const searchTerm = this.value.toLowerCase();
         const userItems = document.querySelectorAll('#users-list .checkbox-item');
-        
+
         userItems.forEach(item => {
             const label = item.querySelector('label').textContent.toLowerCase();
             if (label.includes(searchTerm)) {
@@ -897,7 +905,7 @@ tr:hover {
     searchMotoInput.addEventListener('input', function() {
         const searchTerm = this.value.toLowerCase();
         const motoItems = document.querySelectorAll('#motos-list .checkbox-item');
-        
+
         motoItems.forEach(item => {
             const label = item.querySelector('label').textContent.toLowerCase();
             if (label.includes(searchTerm)) {
@@ -915,12 +923,12 @@ tr:hover {
         // Vérifier si au moins un utilisateur et une moto sont sélectionnés
         const selectedUsers = document.querySelectorAll('.user-checkbox:checked');
         const selectedMotos = document.querySelectorAll('.moto-checkbox:checked');
-        
+
         if (selectedUsers.length === 0 || selectedMotos.length === 0) {
             showToast('Veuillez sélectionner au moins un utilisateur et une moto.', 'error');
             return;
         }
-        
+
         // Soumettre le formulaire
         document.getElementById('association-form').submit();
     }
@@ -939,21 +947,21 @@ tr:hover {
     function filterTable() {
         const searchTerm = searchInput.value.toLowerCase();
         const rows = associationsTableBody.querySelectorAll('tr');
-        
+
         rows.forEach(row => {
             let found = false;
             const cells = row.querySelectorAll('td');
-            
+
             for (let i = 0; i < 4; i++) { // Recherche dans les 4 premières colonnes uniquement
                 if (cells[i].textContent.toLowerCase().includes(searchTerm)) {
                     found = true;
                     break;
                 }
             }
-            
+
             row.style.display = found ? '' : 'none';
         });
-        
+
         // Mettre à jour le compteur de statistiques
         updateStats();
     }
@@ -962,7 +970,7 @@ tr:hover {
         const visibleRows = Array.from(associationsTableBody.querySelectorAll('tr')).filter(row => {
             return row.style.display !== 'none';
         });
-        
+
         document.getElementById('total-associations').textContent = visibleRows.length;
     }
 
@@ -976,13 +984,13 @@ tr:hover {
             toastContainer.className = 'toast-container';
             document.body.appendChild(toastContainer);
         }
-        
+
         const toast = document.createElement('div');
         toast.className = `toast toast-${type}`;
         toast.textContent = message;
-        
+
         toastContainer.appendChild(toast);
-        
+
         setTimeout(() => {
             toast.style.opacity = '0';
             setTimeout(() => toast.remove(), 300);
@@ -993,15 +1001,15 @@ tr:hover {
     // Gestion des messages de session Laravel
     // ------------------------------------------------------------
     @if(session('success'))
-        showToast("{{ session('success') }}", 'success');
+    showToast("{{ session('success') }}", 'success');
     @endif
 
     @if(session('error'))
-        showToast("{{ session('error') }}", 'error');
+    showToast("{{ session('error') }}", 'error');
     @endif
 
     @if(session('warning'))
-        openConfirmAssociationModal("{{ session('moto_id') }}", "{{ session('user_id') }}");
+    openConfirmAssociationModal("{{ session('moto_id') }}", "{{ session('user_id') }}");
     @endif
 
     // ------------------------------------------------------------
@@ -1009,17 +1017,17 @@ tr:hover {
     // ------------------------------------------------------------
     // Boutons d'ouverture des modales
     addAssociationBtn.addEventListener('click', openAddAssociationModal);
-    
+
     // Boutons de confirmation
     document.getElementById('confirm-association').addEventListener('click', submitAssociationForm);
     document.getElementById('confirm-association-btn').addEventListener('click', submitConfirmAssociation);
     document.getElementById('confirm-delete-association').addEventListener('click', submitDeleteAssociation);
-    
+
     // Boutons de fermeture des modales
     document.querySelectorAll('.close-modal').forEach(btn => {
         btn.addEventListener('click', closeAllModals);
     });
-    
+
     // Fermeture des modales en cliquant en dehors
     document.querySelectorAll('.modal').forEach(modal => {
         modal.addEventListener('click', (e) => {
@@ -1028,21 +1036,26 @@ tr:hover {
             }
         });
     });
-    
+
     // Boutons d'action dans le tableau
     document.querySelectorAll('.edit-association').forEach(btn => {
         btn.addEventListener('click', () => openEditAssociationModal(btn.closest('tr')));
     });
-    
+
     document.querySelectorAll('.delete-association').forEach(btn => {
         btn.addEventListener('click', () => openDeleteAssociationModal(btn.closest('tr')));
     });
-    
+
     // Filtre de recherche
     searchInput.addEventListener('input', filterTable);
-    
+
     // Initialiser les événements des checkboxes
     initCheckboxEvents();
 });
+
+
+
+
+   
 </script>
 @endsection

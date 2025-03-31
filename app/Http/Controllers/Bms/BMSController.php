@@ -11,12 +11,15 @@ use Exception;
 
 class BMSController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
-        // Récupérer toutes les batteries validées pour le menu latéral
-        $batteries = BatteriesValide::select('mac_id')->get();
+        // Récupérer l'ID de la batterie depuis la requête
+        $selectedBatteryId = $request->query('battery');
         
-        return view('bms.index', compact('batteries'));
+        // Passer l'ID sélectionné à la vue
+        return view('bms.index', [
+            'selectedBatteryId' => $selectedBatteryId
+        ]);
     }
     
     /**

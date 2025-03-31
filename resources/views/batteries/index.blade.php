@@ -199,7 +199,7 @@
             </div>
         </div>
     </div>
-    
+
     <!-- Tableau des batteries -->
     <div class="table-container">
         <div class="head-table">
@@ -435,7 +435,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     </span>
                 </td>
                 <td>${createdAt}</td>
-                <td>
+                <td style="display: flex; gap: 5px;">
                     <button class="action-btn edit-batterie" title="Modifier" ${batterie.statut === 'validé' ? 'disabled' : ''}>
                         <i class="fas fa-edit"></i>
                     </button>
@@ -445,6 +445,10 @@ document.addEventListener('DOMContentLoaded', function() {
                     <button class="action-btn delete-batterie" title="Supprimer" ${batterie.statut === 'validé' ? 'disabled' : ''}>
                         <i class="fas fa-trash"></i>
                     </button>
+                     <button class="action-btn bms" title="Données BMS">
+                                    <i class="fas fa-chart-line"></i>
+                    </button>
+                    
                 </td>
             `;
             batteriesTableBody.appendChild(row);

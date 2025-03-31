@@ -18,10 +18,10 @@
         <span>Tableau de bord</span>
     </div>
     <a href="{{ route('motos.index') }}">
-    <div class="nav-item">
-        <i class="fas fa-motorcycle"></i>
-        <span>Gestion Motos</span>
-    </div>
+        <div class="nav-item">
+            <i class="fas fa-motorcycle"></i>
+            <span>Gestion Motos</span>
+        </div>
     </a>
     <a href="{{ route('batteries.index') }}">
         <div class="nav-item">
@@ -29,14 +29,18 @@
             <span>Gestion Batteries</span>
         </div>
     </a>
-    <div class="nav-item">
-        <i class="fas fa-users"></i>
-        <span>Utilisateurs</span>
-    </div>
-    <div class="nav-item">
-        <i class="fas fa-wrench"></i>
-        <span>Maintenance</span>
-    </div>
+    <a href="{{ route('chauffeurs.index') }}">
+        <div class="nav-item">
+            <i class="fas fa-users"></i>
+            <span>Utilisateurs</span>
+        </div>
+    </a>
+    <a href="{{ route('associations.index') }}">
+        <div class="nav-item">
+            <i class="fas fa-wrench"></i>
+            <span>Associations</span>
+        </div>
+    </a>
     <div class="nav-item">
         <i class="fas fa-chart-line"></i>
         <span>Rapports</span>

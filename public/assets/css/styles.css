@@ -20,6 +20,8 @@ body {
     overflow-x: hidden;
 }
 
+
+
 .dashboard {
     display: flex;
     min-height: 100vh;

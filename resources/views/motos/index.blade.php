@@ -348,7 +348,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // ------------------------------------------------------------
     // Récupération du token CSRF pour les requêtes AJAX
     const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
-    
+
     // Références aux éléments du tableau et aux champs de recherche/filtres
     const motosTableBody = document.getElementById('motos-table-body');
     const searchInput = document.getElementById('search-moto');
@@ -374,14 +374,16 @@ document.addEventListener('DOMContentLoaded', function() {
             search: searchInput.value
         });
         fetch('/motos?' + params, {
-            headers: { 'Accept': 'application/json' }
-        })
-        .then(response => response.json())
-        .then(motos => {
-            renderMotos(motos);  // Affiche les motos dans le tableau
-            updateStats(motos);  // Met à jour les statistiques affichées
-        })
-        .catch(error => console.error('Erreur de chargement:', error));
+                headers: {
+                    'Accept': 'application/json'
+                }
+            })
+            .then(response => response.json())
+            .then(motos => {
+                renderMotos(motos); // Affiche les motos dans le tableau
+                updateStats(motos); // Met à jour les statistiques affichées
+            })
+            .catch(error => console.error('Erreur de chargement:', error));
     }
 
     /**
@@ -404,6 +406,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     </td>
                     <td>${formatDate(moto.created_at)}</td>
                     <td>
+                        <div style="display: flex; gap: 5px;">
                         <button class="action-btn edit-moto">
                             <i class="fas fa-edit"></i>
                         </button>
@@ -413,6 +416,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         <button class="action-btn delete-moto">
                             <i class="fas fa-trash"></i>
                         </button>
+                        </div>
                     </td>
                 </tr>
             `;
@@ -540,30 +544,30 @@ document.addEventListener('DOMContentLoaded', function() {
      * @param {Event} e - L'événement de soumission.
      */
     function submitAddMoto(e) {
-    e.preventDefault();
-    const form = document.getElementById('add-moto-form');
-    const formData = new FormData(form);
+        e.preventDefault();
+        const form = document.getElementById('add-moto-form');
+        const formData = new FormData(form);
 
-    fetch('/motos', {
-        method: 'POST',
-        headers: {
-            'X-CSRF-TOKEN': csrfToken,
-            'Accept': 'application/json'
-        },
-        body: formData
-    })
-    .then(response => response.json())
-    .then(moto => {
-        loadMotos(); // Recharge la liste des motos
-        closeAllModals();
-        showToast('Moto ajoutée avec succès', 'success');
-        form.reset();
-    })
-    .catch(error => {
-        console.error('Erreur lors de l\'ajout de la moto:', error);
-        alert('Erreur lors de l\'ajout de la moto');
-    });
-}
+        fetch('/motos', {
+                method: 'POST',
+                headers: {
+                    'X-CSRF-TOKEN': csrfToken,
+                    'Accept': 'application/json'
+                },
+                body: formData
+            })
+            .then(response => response.json())
+            .then(moto => {
+                loadMotos(); // Recharge la liste des motos
+                closeAllModals();
+                showToast('Moto ajoutée avec succès', 'success');
+                form.reset();
+            })
+            .catch(error => {
+                console.error('Erreur lors de l\'ajout de la moto:', error);
+                alert('Erreur lors de l\'ajout de la moto');
+            });
+    }
 
 
     /**
@@ -575,24 +579,24 @@ document.addEventListener('DOMContentLoaded', function() {
         const formData = new FormData(form);
 
         fetch(`/motos/${id}`, {
-            method: 'POST',
-            headers: {
-                'X-CSRF-TOKEN': csrfToken,
-                'X-HTTP-METHOD-OVERRIDE': 'PUT'
-            },
-            body: formData
-        })
-        .then(response => response.json())
-        .then(moto => {
-            loadMotos(); // Recharge la liste des motos
-            closeAllModals();
-            showToast('Moto modifiée avec succès', 'success');
-            form.reset();
-        })
-        .catch(error => {
-            console.error('Erreur de modification:', error);
-            alert('Erreur lors de la modification de la moto');
-        });
+                method: 'POST',
+                headers: {
+                    'X-CSRF-TOKEN': csrfToken,
+                    'X-HTTP-METHOD-OVERRIDE': 'PUT'
+                },
+                body: formData
+            })
+            .then(response => response.json())
+            .then(moto => {
+                loadMotos(); // Recharge la liste des motos
+                closeAllModals();
+                showToast('Moto modifiée avec succès', 'success');
+                form.reset();
+            })
+            .catch(error => {
+                console.error('Erreur de modification:', error);
+                alert('Erreur lors de la modification de la moto');
+            });
     }
 
     /**
@@ -604,21 +608,23 @@ document.addEventListener('DOMContentLoaded', function() {
         const formData = new FormData(form);
 
         fetch(`/motos/${id}/validate`, {
-            method: 'POST',
-            headers: { 'X-CSRF-TOKEN': csrfToken },
-            body: formData
-        })
-        .then(response => response.json())
-        .then(motoValidee => {
-            loadMotos();
-            closeAllModals();
-            showToast('Moto validée avec succès', 'success');
-            form.reset();
-        })
-        .catch(error => {
-            console.error('Erreur de validation:', error);
-            alert('Erreur lors de la validation de la moto');
-        });
+                method: 'POST',
+                headers: {
+                    'X-CSRF-TOKEN': csrfToken
+                },
+                body: formData
+            })
+            .then(response => response.json())
+            .then(motoValidee => {
+                loadMotos();
+                closeAllModals();
+                showToast('Moto validée avec succès', 'success');
+                form.reset();
+            })
+            .catch(error => {
+                console.error('Erreur de validation:', error);
+                alert('Erreur lors de la validation de la moto');
+            });
     }
 
     /**
@@ -627,19 +633,21 @@ document.addEventListener('DOMContentLoaded', function() {
     function submitDeleteMoto() {
         const id = document.getElementById('confirm-delete-moto').dataset.id;
         fetch(`/motos/${id}`, {
-            method: 'DELETE',
-            headers: { 'X-CSRF-TOKEN': csrfToken }
-        })
-        .then(response => response.json())
-        .then(result => {
-            loadMotos();
-            closeAllModals();
-            showToast('Moto supprimée avec succès', 'success');
-        })
-        .catch(error => {
-            console.error('Erreur de suppression:', error);
-            alert('Erreur lors de la suppression de la moto');
-        });
+                method: 'DELETE',
+                headers: {
+                    'X-CSRF-TOKEN': csrfToken
+                }
+            })
+            .then(response => response.json())
+            .then(result => {
+                loadMotos();
+                closeAllModals();
+                showToast('Moto supprimée avec succès', 'success');
+            })
+            .catch(error => {
+                console.error('Erreur de suppression:', error);
+                alert('Erreur lors de la suppression de la moto');
+            });
     }
 
     // ------------------------------------------------------------
@@ -709,5 +717,4 @@ document.addEventListener('DOMContentLoaded', function() {
     // Chargement initial des motos
     loadMotos();
 });
-
 </script>
