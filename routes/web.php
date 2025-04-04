@@ -108,84 +108,23 @@ Route::prefix('associations')->name('associations.')->group(function () {
 */
 
 // Routes web
-Route::group(['prefix' => 'associations'], function () {
-    // Page principale des associations batterie-moto-utilisateur
-    Route::get('/batterie/user', [BatteryMotoUserAssociationController::class, 'index'])
-        ->name('associations.batterie.user.index');
-    
-    // Créer une nouvelle association
-    Route::post('/batterie/user/store', [BatteryMotoUserAssociationController::class, 'store'])
-        ->name('associations.batterie.user.store');
-    
-    // Mettre à jour une association
-    Route::put('/batterie/user/{id}', [BatteryMotoUserAssociationController::class, 'update'])
-        ->name('associations.batterie.user.update');
-    
-    // Supprimer une association
-    Route::delete('/batterie/user/{id}', [BatteryMotoUserAssociationController::class, 'destroy'])
-        ->name('associations.batterie.user.destroy');
-    
-    // Confirmer une association
-    Route::post('/batterie/user/confirm', [BatteryMotoUserAssociationController::class, 'confirmAssociation'])
-        ->name('associations.batterie.user.confirm');
-    
-    // Obtenir les détails d'une association
-    Route::get('/batterie/user/{id}/details', [BatteryMotoUserAssociationController::class, 'getAssociationDetails'])
-        ->name('associations.batterie.user.details');
-    
-    // Obtenir toutes les associations (avec filtres)
-    Route::get('/batterie/user/list', [BatteryMotoUserAssociationController::class, 'getAllAssociations'])
-        ->name('associations.batterie.user.list');
-    
-    // Obtenir les statistiques
-    Route::get('/batterie/user/stats', [BatteryMotoUserAssociationController::class, 'getStats'])
-        ->name('associations.batterie.user.stats');
-    
-    // Obtenir les batteries disponibles
-    Route::get('/batterie/user/available-batteries', [BatteryMotoUserAssociationController::class, 'getAvailableBatteries'])
-        ->name('associations.batterie.user.available-batteries');
-    
-    // Obtenir les motos disponibles
-    Route::get('/batterie/user/available-motos', [BatteryMotoUserAssociationController::class, 'getAvailableMotos'])
-        ->name('associations.batterie.user.available-motos');
-        
-    // Nouvelle route pour obtenir les données BMS
-    Route::get('/bms/battery/{macId}', [BatteryMotoUserAssociationController::class, 'getBmsData'])
-        ->name('bms.battery.data');
-});
+// Ajoutez ces routes dans votre fichier de routes (routes/web.php)
 
-// Routes API
-Route::group(['prefix' => 'api/associations'], function () {
-    // Créer une nouvelle association
-    Route::post('/batterie/user', [BatteryMotoUserAssociationController::class, 'store']);
+// Dans routes/web.php
+Route::group(['prefix' => 'associations'], function () {
+    // Mettre les routes spécifiques AVANT les routes paramétrées
+    Route::get('/batteries/motos/available', 'App\Http\Controllers\Associations\BatteryMotoUserAssociationController@getAvailableMotos');
+    Route::get('/batteries/available', 'App\Http\Controllers\Associations\BatteryMotoUserAssociationController@getAvailableBatteries');
+    Route::get('/batteries/bms/{macId}', 'App\Http\Controllers\Associations\BatteryMotoUserAssociationController@getBmsData');
+    Route::post('/batteries/bms/bulk', 'App\Http\Controllers\Associations\BatteryMotoUserAssociationController@getBulkBmsData');
+    Route::get('/batteries/stats', 'App\Http\Controllers\Associations\BatteryMotoUserAssociationController@getStats');
     
-    // Mettre à jour une association
-    Route::put('/batterie/user/{id}', [BatteryMotoUserAssociationController::class, 'update']);
-    Route::post('/batterie/user/{id}', [BatteryMotoUserAssociationController::class, 'update']);
-    
-    // Supprimer une association
-    Route::delete('/batterie/user/{id}', [BatteryMotoUserAssociationController::class, 'destroy']);
-    
-    // Confirmer une association
-    Route::post('/batterie/user/confirm', [BatteryMotoUserAssociationController::class, 'confirmAssociation']);
-    
-    // Obtenir les détails d'une association
-    Route::get('/batterie/user/{id}', [BatteryMotoUserAssociationController::class, 'getAssociationDetails']);
-    
-    // Obtenir toutes les associations (avec filtres)
-    Route::get('/batterie/user', [BatteryMotoUserAssociationController::class, 'getAllAssociations']);
-    
-    // Obtenir les statistiques
-    Route::get('/batterie/user/stats', [BatteryMotoUserAssociationController::class, 'getStats']);
-    
-    // Obtenir les batteries disponibles
-    Route::get('/batterie/user/available-batteries', [BatteryMotoUserAssociationController::class, 'getAvailableBatteries']);
-    
-    // Obtenir les motos disponibles
-    Route::get('/batterie/user/available-motos', [BatteryMotoUserAssociationController::class, 'getAvailableMotos']);
-    
-    // Route API pour les données BMS
-    Route::get('/bms/battery/{macId}', [BatteryMotoUserAssociationController::class, 'getBmsData']);
+    // Routes génériques avec ID APRÈS les routes spécifiques
+    Route::get('/batteries', 'App\Http\Controllers\Associations\BatteryMotoUserAssociationController@index')->name('associations.batteries.index');
+    Route::get('/batteries/{id}', 'App\Http\Controllers\Associations\BatteryMotoUserAssociationController@getAssociationDetails');
+    Route::post('/batteries', 'App\Http\Controllers\Associations\BatteryMotoUserAssociationController@store');
+    Route::put('/batteries/{id}', 'App\Http\Controllers\Associations\BatteryMotoUserAssociationController@update');
+    Route::delete('/batteries/{id}', 'App\Http\Controllers\Associations\BatteryMotoUserAssociationController@destroy');
 });
 
 

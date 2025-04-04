@@ -51,10 +51,21 @@ class ValidatedUser extends Authenticatable
     }
 
 
-    public function batteries()
-    {
-        return $this->hasManyThrough(BatteriesValide::class, MotosValide::class);
-    }
+   // public function batteries()
+   // {
+   //     return $this->hasManyThrough(BatteriesValide::class, MotosValide::class);
+   // }
+
+
+   public function batteryAssociations()
+{
+    return $this->hasManyThrough(
+        BatteryMotoUserAssociation::class,
+        AssociationUserMoto::class,
+        'validated_user_id',
+        'association_user_moto_id'
+    );
+}
 
     // Dans le modèle User :
     public function swaps()

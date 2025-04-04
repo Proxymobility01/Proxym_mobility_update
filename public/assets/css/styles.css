@@ -1223,7 +1223,7 @@ td {
     /* On retire le padding ici pour que le header puisse occuper toute la largeur */
     padding: 0;
     border: 1px solid #888;
-    width: 500px;
+    width: 700px;
     border-radius: 8px;
     overflow: hidden; /* Pour éviter tout débordement */
 }
@@ -1356,7 +1356,7 @@ td {
     margin: 15% auto !important;
     padding: 0 !important;
     border: 1px solid #888 !important;
-    width: 500px !important;
+    width: 700px !important;
     border-radius: 8px !important;
     overflow: hidden !important;
 }

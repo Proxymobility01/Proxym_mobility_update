@@ -23,7 +23,7 @@ class BatteryMotoUserAssociationController extends Controller
     public function index()
     {
         try {
-            // Récupérer les associations existantes avec les relations nécessaires
+            // Récupérer les associations existantes avec les relations nécessaires en utilisant eager loading
             $associations = BatteryMotoUserAssociation::with(['association.validatedUser', 'association.motosValide', 'batterie'])
                 ->orderBy('created_at', 'desc')
                 ->get();
@@ -31,7 +31,7 @@ class BatteryMotoUserAssociationController extends Controller
             // Récupérer les batteries disponibles
             $batteries = BatteriesValide::all();
         
-            // Récupérer les motos associées à des utilisateurs
+            // Récupérer les motos associées à des utilisateurs avec eager loading
             $motos = MotosValide::whereHas('users')
                 ->with('users')
                 ->get();
@@ -39,22 +39,38 @@ class BatteryMotoUserAssociationController extends Controller
             // Récupérer les utilisateurs validés
             $users = ValidatedUser::all();
             
+            // Optimisation: Récupérer toutes les données BMS en une seule requête
+            $macIds = $associations->pluck('batterie.mac_id')->filter()->unique();
+            $bmsDataMap = [];
+            
+            if ($macIds->isNotEmpty()) {
+                // Récupérer la dernière donnée BMS pour chaque mac_id
+                $latestBmsData = DB::table('bms_data')
+                    ->select('mac_id', 'state', 'timestamp')
+                    ->whereIn('mac_id', $macIds)
+                    ->orderBy('timestamp', 'desc')
+                    ->get()
+                    ->groupBy('mac_id')
+                    ->map(function ($group) {
+                        return $group->first();
+                    });
+                
+                foreach ($latestBmsData as $macId => $bmsData) {
+                    $bmsDataMap[$macId] = $bmsData;
+                }
+            }
+            
             // Calculer le nombre de batteries avec niveau faible (< 20%)
             $lowBatteries = 0;
             foreach ($associations as $association) {
                 $macId = $association->batterie->mac_id ?? null;
-                if ($macId) {
-                    $bmsData = BMSData::where('mac_id', $macId)
-                        ->orderBy('timestamp', 'desc')
-                        ->first();
+                if ($macId && isset($bmsDataMap[$macId])) {
+                    $bmsData = $bmsDataMap[$macId];
+                    $stateData = json_decode($bmsData->state, true);
+                    $batteryLevel = $stateData['SOC'] ?? 0;
                     
-                    if ($bmsData) {
-                        $stateData = json_decode($bmsData->state, true);
-                        $batteryLevel = $stateData['SOC'] ?? 0;
-                        
-                        if ($batteryLevel < 20) {
-                            $lowBatteries++;
-                        }
+                    if ($batteryLevel < 20) {
+                        $lowBatteries++;
                     }
                 }
             }
@@ -110,60 +126,94 @@ class BatteryMotoUserAssociationController extends Controller
     
     /**
      * Récupère une liste de batteries disponibles pour l'association
+     * Optimisé avec chargement en lot des données BMS
      */
-    public function getAvailableBatteries()
-    {
-        try {
-            Log::info('Récupération des batteries disponibles');
+   /**
+ * Récupère une liste des batteries disponibles qui ne sont pas encore associées
+ */
+public function getAvailableBatteries()
+{
+    try {
+        Log::info('Récupération des batteries disponibles non associées');
+        
+        // Récupérer les IDs des batteries déjà associées
+        $associatedBatteryIds = BatteryMotoUserAssociation::pluck('battery_id')->toArray();
+        
+        // Récupérer toutes les batteries qui ne sont pas dans la liste des batteries associées
+        $batteries = BatteriesValide::whereNotIn('id', $associatedBatteryIds)
+            ->orderBy('created_at', 'desc')
+            ->get();
+        
+        // Si on est en mode édition, on doit aussi inclure la batterie actuellement associée
+        if (request()->has('include_battery_id')) {
+            $includeBatteryId = request()->input('include_battery_id');
+            $currentBattery = BatteriesValide::find($includeBatteryId);
             
-            // On inclut toutes les batteries, même celles déjà associées
-            // pour permettre le changement d'association dans l'édition
-            $batteries = BatteriesValide::orderBy('created_at', 'desc')
-                ->get();
-            
-            $data = $batteries->map(function($battery) {
-                // Vérifier si la batterie est en ligne à partir des données BMS
-                $status = 'offline';
-                $batteryLevel = 0;
-                
-                if ($battery->mac_id) {
-                    $bmsData = BMSData::where('mac_id', $battery->mac_id)
-                        ->orderBy('timestamp', 'desc')
-                        ->first();
-                    
-                    if ($bmsData) {
-                        $stateData = json_decode($bmsData->state, true);
-                        $batteryLevel = $stateData['SOC'] ?? 0;
-                        
-                        // Déterminer si la batterie est en ligne (dernière mise à jour < 5 min)
-                        $lastBmsTime = strtotime($bmsData->timestamp);
-                        $isOnline = (time() - $lastBmsTime < 300);
-                        $status = $isOnline ? 'online' : 'offline';
-                    }
-                }
-                
-                return [
-                    'id' => $battery->id,
-                    'batterie_unique_id' => $battery->batterie_unique_id,
-                    'mac_id' => $battery->mac_id,
-                    'pourcentage' => $batteryLevel, // Utiliser la valeur des données BMS
-                    'status' => $status,
-                    'created_at' => Carbon::parse($battery->created_at)->format('d/m/Y'),
-                ];
-            });
-            
-            Log::info('Batteries disponibles récupérées: ' . $batteries->count());
-            
-            return response()->json([
-                'data' => $data
-            ]);
-        } catch (\Exception $e) {
-            Log::error('Erreur lors du chargement des batteries disponibles: ' . $e->getMessage());
-            return response()->json([
-                'error' => 'Erreur lors du chargement des batteries disponibles: ' . $e->getMessage()
-            ], 500);
+            if ($currentBattery) {
+                // Ajouter la batterie actuelle à la collection
+                $batteries->push($currentBattery);
+            }
         }
+        
+        // Récupérer tous les mac_ids en une seule fois
+        $macIds = $batteries->pluck('mac_id')->filter()->unique();
+        $bmsDataMap = [];
+        
+        if ($macIds->isNotEmpty()) {
+            // Récupérer la dernière donnée BMS pour chaque mac_id en une seule requête
+            $latestBmsData = DB::table('bms_data')
+                ->select('mac_id', 'state', 'timestamp')
+                ->whereIn('mac_id', $macIds)
+                ->orderBy('timestamp', 'desc')
+                ->get()
+                ->groupBy('mac_id')
+                ->map(function ($group) {
+                    return $group->first();
+                });
+            
+            foreach ($latestBmsData as $macId => $bmsData) {
+                $bmsDataMap[$macId] = $bmsData;
+            }
+        }
+        
+        $data = $batteries->map(function($battery) use ($bmsDataMap) {
+            // Vérifier si la batterie est en ligne à partir des données BMS
+            $status = 'offline';
+            $batteryLevel = 0;
+            
+            if ($battery->mac_id && isset($bmsDataMap[$battery->mac_id])) {
+                $bmsData = $bmsDataMap[$battery->mac_id];
+                $stateData = json_decode($bmsData->state, true);
+                $batteryLevel = $stateData['SOC'] ?? 0;
+                
+                // Déterminer si la batterie est en ligne (dernière mise à jour < 5 min)
+                $lastBmsTime = strtotime($bmsData->timestamp);
+                $isOnline = (time() - $lastBmsTime < 300);
+                $status = $isOnline ? 'online' : 'offline';
+            }
+            
+            return [
+                'id' => $battery->id,
+                'batterie_unique_id' => $battery->batterie_unique_id,
+                'mac_id' => $battery->mac_id,
+                'pourcentage' => $batteryLevel,
+                'status' => $status,
+                'created_at' => Carbon::parse($battery->created_at)->format('d/m/Y'),
+            ];
+        });
+        
+        Log::info('Batteries disponibles non associées récupérées: ' . $batteries->count());
+        
+        return response()->json([
+            'data' => $data
+        ]);
+    } catch (\Exception $e) {
+        Log::error('Erreur lors du chargement des batteries disponibles: ' . $e->getMessage());
+        return response()->json([
+            'error' => 'Erreur lors du chargement des batteries disponibles: ' . $e->getMessage()
+        ], 500);
     }
+}
     
     /**
      * Récupère une liste de motos disponibles pour l'association
@@ -173,9 +223,9 @@ class BatteryMotoUserAssociationController extends Controller
         try {
             Log::info('Récupération des motos disponibles');
             
-            // On récupère seulement les motos qui ont un utilisateur associé
+            // On récupère seulement les motos qui ont un utilisateur associé avec eager loading
             $motos = MotosValide::whereHas('users')
-                ->with('users')
+                ->with('users') // Charger tous les utilisateurs associés en une seule requête
                 ->orderBy('created_at', 'desc')
                 ->get();
             
@@ -334,181 +384,286 @@ class BatteryMotoUserAssociationController extends Controller
     }
 
     /**
-     * Stocker une nouvelle association batterie-moto-utilisateur ou mettre à jour une existante
-     */
-    public function store(Request $request)
-    {
-        try {
-            Log::info('Tentative de création d\'une association');
-            Log::info('Données reçues: ' . json_encode($request->all()));
-            
-            // Valider les données
-            $validator = Validator::make($request->all(), [
-                'battery_unique_id' => 'required|exists:batteries_valides,batterie_unique_id',
-                'moto_unique_id' => 'required|exists:motos_valides,moto_unique_id',
-            ]);
-    
-            if ($validator->fails()) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Erreur de validation: ' . implode(' ', $validator->errors()->all())
-                ], 422);
-            }
-    
-            // Extraire les valeurs
-            $batteryId = $request->battery_unique_id;
-            $motoId = $request->moto_unique_id;
-    
-            // Rechercher la moto et la batterie
-            $moto = MotosValide::where('moto_unique_id', $motoId)->first();
-            $batterie = BatteriesValide::where('batterie_unique_id', $batteryId)->first();
-    
-            if (!$moto || !$batterie) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Moto ou batterie introuvable.'
-                ], 404);
-            }
-    
-            // ⚠️ Correction ici : utiliser `moto_valide_id`
-            $motoAssociation = AssociationUserMoto::where('moto_valide_id', $moto->id)->first();
-            if (!$motoAssociation) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Aucune association utilisateur-moto trouvée pour cette moto.'
-                ], 404);
-            }
-    
-            DB::beginTransaction();
-    
-            // Vérifier si une association existe déjà
-            $existingAssociation = BatteryMotoUserAssociation::where('association_user_moto_id', $motoAssociation->id)->first();
-    
-            if ($existingAssociation) {
-                // Mise à jour
-                $existingAssociation->battery_id = $batterie->id;
-                $existingAssociation->date_association = now();
-                $existingAssociation->save();
-            } else {
-                // Nouvelle association
-                $association = new BatteryMotoUserAssociation();
-                $association->association_user_moto_id = $motoAssociation->id;
-                $association->battery_id = $batterie->id;
-                $association->date_association = now();
-                $association->save();
-            }
-    
-            DB::commit();
-    
-            return response()->json([
-                'success' => true,
-                'message' => 'Association créée ou mise à jour avec succès.'
-            ]);
-    
-        } catch (\Exception $e) {
-            DB::rollBack();
-            Log::error('Erreur dans store : ' . $e->getMessage());
+ * Obtenir les données BMS pour plusieurs batteries en une seule requête
+ * Optimisation pour éviter de multiples requêtes individuelles
+ */
+public function getBulkBmsData(Request $request)
+{
+    try {
+        $validator = Validator::make($request->all(), [
+            'mac_ids' => 'required|array',
+            'mac_ids.*' => 'string|min:1'
+        ]);
+
+        if ($validator->fails()) {
             return response()->json([
                 'success' => false,
-                'message' => 'Erreur serveur : ' . $e->getMessage()
-            ], 500);
+                'message' => 'Paramètres invalides: ' . implode(' ', $validator->errors()->all())
+            ], 422);
         }
+
+        $macIds = $request->mac_ids;
+        Log::info('Récupération des données BMS en lot pour ' . count($macIds) . ' batteries');
+        
+        $result = [];
+        
+        // Récupérer les dernières données BMS pour chaque mac_id en une seule requête
+        $bmsDataCollection = DB::table('bms_data')
+            ->select('mac_id', 'state', 'timestamp')
+            ->whereIn('mac_id', $macIds)
+            ->orderBy('timestamp', 'desc')
+            ->get();
+        
+        // Regrouper les données par mac_id pour avoir seulement la dernière entrée pour chaque batterie
+        $groupedData = $bmsDataCollection->groupBy('mac_id');
+        
+        foreach ($groupedData as $macId => $dataGroup) {
+            $bmsData = $dataGroup->first();
+            if (!$bmsData) continue;
+            
+            $currentState = json_decode($bmsData->state, true);
+            
+            // Déterminer si la batterie est en ligne (dernière mise à jour < 5 min)
+            $lastBmsTime = strtotime($bmsData->timestamp);
+            $isOnline = (time() - $lastBmsTime < 300);
+            
+            $result[$macId] = [
+                'mac_id' => $macId,
+                'status' => $isOnline ? 'Online' : 'Offline',
+                'soc' => $currentState['SOC'] ?? 0,
+                'voltage' => $currentState['TotalVoltage'] ?? 0,
+                'current' => $currentState['Current'] ?? 0,
+                'updatedAt' => Carbon::parse($bmsData->timestamp)->format('d/m/Y H:i:s')
+            ];
+        }
+        
+        return response()->json([
+            'success' => true,
+            'data' => $result
+        ]);
+        
+    } catch (\Exception $e) {
+        Log::error('Erreur lors du chargement des données BMS en lot: ' . $e->getMessage());
+        return response()->json([
+            'success' => false,
+            'message' => 'Erreur lors du chargement des données BMS: ' . $e->getMessage()
+        ], 500);
     }
-    
-    
-    /**
-     * Mettre à jour une association existante
-     */
-    public function update(Request $request, $id)
-    {
-        try {
-            Log::info("Tentative de mise à jour de l'association ID: {$id}");
-            Log::info('Données reçues: ' . json_encode($request->all()));
+}
+
+  /**
+ * Stocker une nouvelle association batterie-moto-utilisateur
+ */
+public function store(Request $request)
+{
+    try {
+        Log::info('Tentative de création d\'une association');
+        
+        // Valider les données de la requête
+        $validator = Validator::make($request->all(), [
+            'battery_unique_id' => 'required|exists:batteries_valides,batterie_unique_id',
+            'moto_unique_id' => 'required|exists:motos_valides,moto_unique_id',
+        ], [
+            'battery_unique_id.required' => 'Le champ "battery_unique_id" est requis.',
+            'battery_unique_id.exists' => 'La batterie avec ce "battery_unique_id" n\'existe pas.',
+            'moto_unique_id.required' => 'Le champ "moto_unique_id" est requis.',
+            'moto_unique_id.exists' => 'La moto avec ce "moto_unique_id" n\'existe pas.',
+        ]);
+
+        // Si la validation échoue, retourner une réponse avec les erreurs
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Erreur de validation: ' . implode(' ', $validator->errors()->all())
+            ], 422);
+        }
+
+        // Recherche ou échec pour la moto et la batterie
+        $moto = MotosValide::where('moto_unique_id', $request->moto_unique_id)->firstOrFail();
+        $batterie = BatteriesValide::where('batterie_unique_id', $request->battery_unique_id)->firstOrFail();
+
+        Log::info('Moto trouvée : ID=' . $moto->id . ', moto_unique_id=' . $moto->moto_unique_id);
+        Log::info('Batterie trouvée : ID=' . $batterie->id . ', batterie_unique_id=' . $batterie->batterie_unique_id);
+
+        // Vérifier si l'association moto-utilisateur existe
+        $motoAssociation = AssociationUserMoto::where('moto_valide_id', $moto->id)->first();
+
+        if (!$motoAssociation) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Aucune association utilisateur trouvée pour cette moto. Veuillez associer un utilisateur à la moto avant de procéder.'
+            ], 404);
+        }
+
+        Log::info('Association moto-utilisateur trouvée : ID=' . $motoAssociation->id);
+        
+        // Vérifier si la batterie est déjà associée à une autre moto
+       // Vérifier si la batterie est déjà associée à une autre moto
+$existingBatteryAssociation = BatteryMotoUserAssociation::where('battery_id', $batterie->id)->first();
+if ($existingBatteryAssociation) {
+    return response()->json([
+        'success' => false,
+        'message' => 'Cette batterie est déjà associée à une autre moto. Veuillez d\'abord supprimer cette association.'
+    ], 400);
+}
+
+        // Commencer une transaction pour garantir la cohérence des données
+        DB::beginTransaction();
+
+        // Vérifier si une association existe déjà pour cette moto dans l'association moto-utilisateur
+        $existingAssociation = BatteryMotoUserAssociation::where('association_user_moto_id', $motoAssociation->id)->first();
+
+        if ($existingAssociation) {
+            // Mise à jour de l'association existante
+            Log::info('Mise à jour de l\'association existante : ID=' . $existingAssociation->id);
+            $existingAssociation->battery_id = $batterie->id;  // ID de la batterie
+            $existingAssociation->date_association = now();  // Date d'association
+            $existingAssociation->save();
             
-            // Valider les données
-            $validator = Validator::make($request->all(), [
-                'battery_unique_id' => 'required|exists:batteries_valides,batterie_unique_id',
-                'moto_unique_id' => 'required|exists:motos_valides,moto_unique_id',
-            ], [
-                'battery_unique_id.required' => 'Vous devez sélectionner une batterie.',
-                'battery_unique_id.exists' => 'La batterie sélectionnée n\'existe pas.',
-                'moto_unique_id.required' => 'Vous devez sélectionner une moto.',
-                'moto_unique_id.exists' => 'La moto sélectionnée n\'existe pas.',
-            ]);
-            
-            if ($validator->fails()) {
-                Log::warning('Validation échouée: ' . json_encode($validator->errors()->toArray()));
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Erreur de validation: ' . implode(' ', $validator->errors()->all())
-                ], 422);
-            }
-            
-            // Trouver l'association à mettre à jour
-            $association = BatteryMotoUserAssociation::findOrFail($id);
-            
-            // Récupérer les nouvelles données
-            $batteryId = $request->input('battery_unique_id');
-            $motoId = $request->input('moto_unique_id');
-            
-            // Rechercher la moto
-            $moto = MotosValide::where('moto_unique_id', $motoId)->first();
-            if (!$moto) {
-                Log::warning("Moto non trouvée: {$motoId}");
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Moto non trouvée dans la table des motos valides.'
-                ], 404);
-            }
-            
-            // Rechercher la batterie
-            $batterie = BatteriesValide::where('batterie_unique_id', $batteryId)->first();
-            if (!$batterie) {
-                Log::warning("Batterie non trouvée: {$batteryId}");
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Batterie non trouvée dans la table des batteries valides.'
-                ], 404);
-            }
-            
-            // Récupérer l'association utilisateur-moto
-            $motoAssociation = AssociationUserMoto::where('moto_id', $moto->id)->first();
-            if (!$motoAssociation) {
-                Log::warning("Association utilisateur-moto non trouvée pour la moto: {$motoId}");
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Aucune association utilisateur-moto trouvée pour cette moto.'
-                ], 404);
-            }
-            
-            DB::beginTransaction();
-            
-            // Mettre à jour l'association
-            $association->association_id = $motoAssociation->id;
-            $association->batterie_id = $batterie->id;
-            $association->updated_at = now();
+            $message = 'Association mise à jour avec succès.';
+        } else {
+            // Création d'une nouvelle association
+            Log::info('Création d\'une nouvelle association');
+            $association = new BatteryMotoUserAssociation();
+            $association->association_user_moto_id = $motoAssociation->id;  // Utilisation de l'ID de l'association moto-utilisateur
+            $association->battery_id = $batterie->id;  // ID de la batterie
+            $association->date_association = now();  // Date d'association
             $association->save();
             
-            DB::commit();
-            
-            Log::info("Association ID {$id} mise à jour avec succès");
-            
-            return response()->json([
-                'success' => true,
-                'message' => "L'association a été mise à jour avec succès."
-            ]);
-            
-        } catch (\Exception $e) {
-            DB::rollBack();
-            Log::error("Erreur lors de la mise à jour de l'association: " . $e->getMessage());
-            Log::error($e->getTraceAsString());
-            
+            $message = 'Association créée avec succès.';
+        }
+
+        // Valider la transaction
+        DB::commit();
+
+        // Retourner une réponse avec succès
+        return response()->json([
+            'success' => true,
+            'message' => $message
+        ]);
+
+    } catch (\Exception $e) {
+        // Annuler la transaction en cas d'erreur
+        DB::rollBack();
+        Log::error('Erreur dans store : ' . $e->getMessage());
+        Log::error('Trace : ' . $e->getTraceAsString());
+        
+        // Retourner une réponse avec l'erreur
+        return response()->json([
+            'success' => false,
+            'message' => 'Erreur serveur : ' . $e->getMessage()
+        ], 500);
+    }
+}
+
+
+
+/**
+ * Mettre à jour une association existante
+ */
+public function update(Request $request, $id)
+{
+    try {
+        Log::info("Tentative de mise à jour de l'association ID: {$id}");
+        Log::info('Données reçues: ' . json_encode($request->all()));
+        
+        // Valider les données
+        $validator = Validator::make($request->all(), [
+            'battery_unique_id' => 'required|exists:batteries_valides,batterie_unique_id',
+            'moto_unique_id' => 'required|exists:motos_valides,moto_unique_id',
+        ], [
+            'battery_unique_id.required' => 'Vous devez sélectionner une batterie.',
+            'battery_unique_id.exists' => 'La batterie sélectionnée n\'existe pas.',
+            'moto_unique_id.required' => 'Vous devez sélectionner une moto.',
+            'moto_unique_id.exists' => 'La moto sélectionnée n\'existe pas.',
+        ]);
+        
+        if ($validator->fails()) {
+            Log::warning('Validation échouée: ' . json_encode($validator->errors()->toArray()));
             return response()->json([
                 'success' => false,
-                'message' => "Une erreur est survenue lors de la mise à jour de l'association: " . $e->getMessage()
-            ], 500);
+                'message' => 'Erreur de validation: ' . implode(' ', $validator->errors()->all())
+            ], 422);
         }
+        
+        // Trouver l'association à mettre à jour
+        $association = BatteryMotoUserAssociation::findOrFail($id);
+        
+        // Récupérer les valeurs unique_id de la requête
+        $batteryUniqueId = $request->input('battery_unique_id');
+        $motoUniqueId = $request->input('moto_unique_id');
+        
+        // Rechercher la moto et la batterie en utilisant les unique_id
+        $moto = MotosValide::where('moto_unique_id', $motoUniqueId)->first();
+        $batterie = BatteriesValide::where('batterie_unique_id', $batteryUniqueId)->first();
+        
+        if (!$moto) {
+            Log::warning("Moto non trouvée: {$motoUniqueId}");
+            return response()->json([
+                'success' => false,
+                'message' => 'Moto non trouvée dans la table des motos valides.'
+            ], 404);
+        }
+        
+        if (!$batterie) {
+            Log::warning("Batterie non trouvée: {$batteryUniqueId}");
+            return response()->json([
+                'success' => false,
+                'message' => 'Batterie non trouvée dans la table des batteries valides.'
+            ], 404);
+        }
+        
+        // Vérifier si la batterie est déjà associée à une autre moto
+        $existingBatteryAssociation = BatteryMotoUserAssociation::where('battery_id', $batterie->id)
+            ->where('id', '!=', $id)
+            ->first();
+            
+        if ($existingBatteryAssociation) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Cette batterie est déjà associée à une autre moto. Veuillez d\'abord supprimer cette association.'
+            ], 400);
+        }
+        
+        // Récupérer l'association utilisateur-moto en utilisant l'ID de la moto
+        $motoAssociation = AssociationUserMoto::where('moto_valide_id', $moto->id)->first();
+        
+        if (!$motoAssociation) {
+            Log::warning("Association utilisateur-moto non trouvée pour la moto: {$moto->id}");
+            return response()->json([
+                'success' => false,
+                'message' => 'Aucune association utilisateur-moto trouvée pour cette moto.'
+            ], 404);
+        }
+        
+        DB::beginTransaction();
+        
+        // Mettre à jour l'association avec les IDs (pas les unique_ids)
+        $association->association_user_moto_id = $motoAssociation->id;
+        $association->battery_id = $batterie->id;
+        $association->updated_at = now();
+        $association->save();
+        
+        DB::commit();
+        
+        Log::info("Association ID {$id} mise à jour avec succès");
+        
+        return response()->json([
+            'success' => true,
+            'message' => "L'association a été mise à jour avec succès."
+        ]);
+        
+    } catch (\Exception $e) {
+        DB::rollBack();
+        Log::error("Erreur lors de la mise à jour de l'association: " . $e->getMessage());
+        Log::error($e->getTraceAsString());
+        
+        return response()->json([
+            'success' => false,
+            'message' => "Une erreur est survenue lors de la mise à jour de l'association: " . $e->getMessage()
+        ], 500);
     }
+}
     
     /**
      * Supprimer une association
@@ -540,6 +695,7 @@ class BatteryMotoUserAssociationController extends Controller
     
     /**
      * Récupérer les statistiques pour le tableau de bord
+     * Optimisé avec chargement en lot des données BMS
      */
     public function getStats()
     {
@@ -548,24 +704,41 @@ class BatteryMotoUserAssociationController extends Controller
             $totalBatteries = BatteriesValide::count();
             $totalUsers = ValidatedUser::count();
             
-            // Calculer le nombre de batteries avec niveau faible (< 20%)
-            $lowBatteries = 0;
+            // Récupérer toutes les associations avec les batteries en une seule requête
             $associations = BatteryMotoUserAssociation::with('batterie')->get();
             
+            // Récupérer tous les mac_ids en une seule fois
+            $macIds = $associations->pluck('batterie.mac_id')->filter()->unique();
+            $bmsDataMap = [];
+            
+            if ($macIds->isNotEmpty()) {
+                // Récupérer la dernière donnée BMS pour chaque mac_id en une seule requête
+                $latestBmsData = DB::table('bms_data')
+                    ->select('mac_id', 'state', 'timestamp')
+                    ->whereIn('mac_id', $macIds)
+                    ->orderBy('timestamp', 'desc')
+                    ->get()
+                    ->groupBy('mac_id')
+                    ->map(function ($group) {
+                        return $group->first();
+                    });
+                
+                foreach ($latestBmsData as $macId => $bmsData) {
+                    $bmsDataMap[$macId] = $bmsData;
+                }
+            }
+            
+            // Calculer le nombre de batteries avec niveau faible (< 20%)
+            $lowBatteries = 0;
             foreach ($associations as $association) {
                 $macId = $association->batterie->mac_id ?? null;
-                if ($macId) {
-                    $bmsData = BMSData::where('mac_id', $macId)
-                        ->orderBy('timestamp', 'desc')
-                        ->first();
+                if ($macId && isset($bmsDataMap[$macId])) {
+                    $bmsData = $bmsDataMap[$macId];
+                    $stateData = json_decode($bmsData->state, true);
+                    $batteryLevel = $stateData['SOC'] ?? 0;
                     
-                    if ($bmsData) {
-                        $stateData = json_decode($bmsData->state, true);
-                        $batteryLevel = $stateData['SOC'] ?? 0;
-                        
-                        if ($batteryLevel < 20) {
-                            $lowBatteries++;
-                        }
+                    if ($batteryLevel < 20) {
+                        $lowBatteries++;
                     }
                 }
             }
