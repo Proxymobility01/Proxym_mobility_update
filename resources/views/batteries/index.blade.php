@@ -208,6 +208,10 @@
                 <i class="fas fa-eye"></i>
                 Voir les Details du BMS
             </a>
+            <a href="{{ route('batteries.map') }}">
+                <i class="fas fa-map-marker-alt"></i>
+                Voir toutes les batteries sur la carte
+            </a>
         </div>
         <table id="batteries-table">
             <thead>

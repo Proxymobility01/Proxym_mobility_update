@@ -8,6 +8,10 @@ use App\Http\Controllers\Bms\BMSController;
 use App\Http\Controllers\Associations\AssociationUserMotoController;
 use App\Http\Controllers\Associations\BatteryMotoUserAssociationController;
 use App\Http\Controllers\Chauffeurs\ChauffeurController;
+use App\Http\Controllers\Agences\AgenceController;
+use App\Http\Controllers\Entrepots\EntrepotController;
+use App\Http\Controllers\Distributeurs\DistributeurController;
+
 
 Route::get('/', function () {
     return view('welcome');
@@ -126,7 +130,13 @@ Route::group(['prefix' => 'associations'], function () {
     Route::put('/batteries/{id}', 'App\Http\Controllers\Associations\BatteryMotoUserAssociationController@update');
     Route::delete('/batteries/{id}', 'App\Http\Controllers\Associations\BatteryMotoUserAssociationController@destroy');
 });
+// Route pour afficher la page avec la carte
+Route::get('/batteries/map', [App\Http\Controllers\Batteries\BatterieController::class, 'showBatteriesOnMap'])
+    ->name('batteries.map');
 
+// Routes API pour les données de la carte (mais dans web.php)
+Route::get('/batteries/api/map-data', [App\Http\Controllers\Batteries\BatterieController::class, 'getBatteriesMapData']);
+Route::get('/batteries/api/map-updates', [App\Http\Controllers\Batteries\BatterieController::class, 'getBatteriesUpdates']);
 
 
 // Routes pour la gestion des chauffeurs
@@ -140,3 +150,87 @@ Route::group(['prefix' => 'associations'], function () {
     // Routes pour la validation et le rejet
     Route::post('/chauffeurs/{id}/validate', [ChauffeurController::class, 'validate'])->name('chauffeurs.validate');
     Route::post('/chauffeurs/{id}/reject', [ChauffeurController::class, 'reject'])->name('chauffeurs.reject');
+
+
+
+    // gestion des agences
+
+Route::prefix('agences')->name('agences.')->group(function () {
+    // Routes principales
+    Route::get('/', [AgenceController::class, 'index'])->name('index');
+    Route::post('/', [AgenceController::class, 'store'])->name('store');
+    Route::put('/{agence}', [AgenceController::class, 'update'])->name('update');
+    Route::delete('/{agence}', [AgenceController::class, 'destroy'])->name('destroy');
+    
+    // Routes AJAX
+    Route::get('/list', [AgenceController::class, 'getAgencesList'])->name('list');
+    Route::get('/stats', [AgenceController::class, 'getStats'])->name('stats');
+    Route::get('/{agence}/edit', [AgenceController::class, 'edit'])->name('edit');
+});
+
+
+
+// gestion des entrepôts
+Route::prefix('entrepots')->name('entrepots.')->group(function () {
+    // Routes principales
+    Route::get('/', [EntrepotController::class, 'index'])->name('index');
+    Route::post('/', [EntrepotController::class, 'store'])->name('store');
+    Route::put('/{entrepot}', [EntrepotController::class, 'update'])->name('update');
+    Route::delete('/{entrepot}', [EntrepotController::class, 'destroy'])->name('destroy');
+    
+    // Routes AJAX
+    Route::get('/list', [EntrepotController::class, 'getEntrepotsList'])->name('list');
+    Route::get('/stats', [EntrepotController::class, 'getStats'])->name('stats');
+    Route::get('/{entrepot}/edit', [EntrepotController::class, 'edit'])->name('edit');
+});
+
+// Routes pour la gestion des distributeurs
+Route::prefix('distributeurs')->name('distributeurs.')->group(function () {
+    // Route pour afficher la liste des distributeurs et le formulaire d'ajout/modification
+    Route::get('/', [DistributeurController::class, 'index'])->name('index');
+    
+    // Route pour récupérer la liste des distributeurs (pour AJAX)
+    Route::get('/list', [DistributeurController::class, 'getDistributeursList'])->name('list');
+    
+    // Route pour récupérer les statistiques actualisées
+    Route::get('/stats', [DistributeurController::class, 'getStatistics'])->name('stats');
+    
+    // Route pour récupérer les détails d'un distributeur spécifique pour l'édition (pour AJAX)
+    Route::get('/{id}/edit', [DistributeurController::class, 'edit'])->name('edit');
+    
+    // Route pour enregistrer un nouveau distributeur
+    Route::post('/', [DistributeurController::class, 'store'])->name('store');
+    
+    // Route pour mettre à jour un distributeur existant
+    Route::put('/{id}', [DistributeurController::class, 'update'])->name('update');
+    
+    // Route pour supprimer un distributeur
+    Route::delete('/{id}', [DistributeurController::class, 'destroy'])->name('destroy');
+});
+
+
+
+
+
+
+
+
+// Route principale pour la page des leases
+Route::get('/leases', [App\Http\Controllers\Leases\LeaseController::class, 'index'])->name('leases.index');
+
+// Routes API pour le filtrage et les statistiques
+Route::post('/api/leases/filter', [App\Http\Controllers\Leases\LeaseController::class, 'filterLeases'])->name('api.leases.filter');
+Route::post('/api/leases/stats', [App\Http\Controllers\Leases\LeaseController::class, 'getStats'])->name('api.leases.stats');
+
+
+
+
+
+
+// Route pour afficher la vue principale des swaps
+Route::get('/swaps', [App\Http\Controllers\Associations\SwapController::class, 'index'])->name('swaps.index');
+// Route pour traiter un swap
+Route::post('/swaps/handle', [App\Http\Controllers\Associations\SwapController::class, 'handleSwap'])->name('swaps.handle');
+// Routes API pour les statistiques et le filtrage
+Route::post('/api/swaps/filter', [App\Http\Controllers\Associations\SwapController::class, 'filterSwaps'])->name('api.swaps.filter');
+Route::post('/api/swaps/stats', [App\Http\Controllers\Associations\SwapController::class, 'getStats'])->name('api.swaps.stats');
