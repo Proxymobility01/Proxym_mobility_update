@@ -11,6 +11,7 @@ use App\Http\Controllers\Chauffeurs\ChauffeurController;
 use App\Http\Controllers\Agences\AgenceController;
 use App\Http\Controllers\Entrepots\EntrepotController;
 use App\Http\Controllers\Distributeurs\DistributeurController;
+use App\Http\Controllers\Employes\EmployeController;
 
 
 Route::get('/', function () {
@@ -234,3 +235,35 @@ Route::post('/swaps/handle', [App\Http\Controllers\Associations\SwapController::
 // Routes API pour les statistiques et le filtrage
 Route::post('/api/swaps/filter', [App\Http\Controllers\Associations\SwapController::class, 'filterSwaps'])->name('api.swaps.filter');
 Route::post('/api/swaps/stats', [App\Http\Controllers\Associations\SwapController::class, 'getStats'])->name('api.swaps.stats');
+
+
+
+
+// Routes for Employee Management
+// Add these routes to your web.php file
+
+// Employee Management
+Route::prefix('employe')->name('employe.')->group(function () {
+
+    Route::post('/login', [EmployeController::class, 'login'])->name('login.submit');
+    
+    // Protected routes (require authentication)
+        // Main dashboard/index
+        Route::get('/', [EmployeController::class, 'index'])->name('index');
+        
+        // API-like routes for AJAX
+        Route::get('/list', [EmployeController::class, 'list'])->name('list');
+        Route::post('/store', [EmployeController::class, 'store'])->name('store');
+        Route::get('/{id}', [EmployeController::class, 'show'])->name('show');
+        Route::get('/{id}/edit', [EmployeController::class, 'edit'])->name('edit');
+        Route::put('/update/{id}', [EmployeController::class, 'update'])->name('update');
+        Route::delete('/destroy/{id}', [EmployeController::class, 'destroy'])->name('destroy');
+        Route::patch('/restore/{id}', [EmployeController::class, 'restore'])->name('restore');
+        Route::get('/export', [EmployeController::class, 'export'])->name('export');
+        
+        // Logout
+        Route::post('/logout', [EmployeController::class, 'logout'])->name('logout');
+    
+});
+    // Public routes (login)
+    Route::get('/login', [EmployeController::class, 'showLoginForm'])->name('login');

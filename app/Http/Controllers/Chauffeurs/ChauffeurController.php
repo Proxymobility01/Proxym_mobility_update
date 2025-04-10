@@ -58,9 +58,9 @@ class ChauffeurController extends Controller
             'phone' => 'required|string|unique:validated_users,phone',
             'password' => 'required|string|min:8',
             'numero_cni' => 'required|string|unique:validated_users,numero_cni',
-            'photo_cni_recto' => 'nullable|image|mimes:jpeg,png,jpg|max:2048',
-            'photo_cni_verso' => 'nullable|image|mimes:jpeg,png,jpg|max:2048',
-            'photo' => 'nullable|image|mimes:jpeg,png,jpg|max:2048',
+            'photo_cni_recto' => 'nullable|image|mimes:jpeg,png,jpg|max:8048',
+            'photo_cni_verso' => 'nullable|image|mimes:jpeg,png,jpg|max:8048',
+            'photo' => 'nullable|image|mimes:jpeg,png,jpg|max:8048',
         ]);
 
         if ($validator->fails()) {
@@ -140,6 +140,11 @@ class ChauffeurController extends Controller
         $chauffeur->email = $request->email;
         $chauffeur->phone = $request->phone;
         $chauffeur->numero_cni = $request->numero_cni;
+
+          // Si le statut était "rejeté", on le remet à "en attente"
+    if ($chauffeur->status === 'rejeté') {
+        $chauffeur->status = 'en attente';
+    }
 
         // Mise à jour conditionnelle du mot de passe
         if ($request->filled('password')) {

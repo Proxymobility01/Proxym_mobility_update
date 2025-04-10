@@ -322,6 +322,21 @@ tr:hover {
         <div id="date" class="date">{{ date('d/m/Y') }}</div>
     </div>
 
+
+    <!-- Onglets de navigation -->
+<div class="nav-tabs">
+    <a href="{{ route('agences.index') }}" class="nav-tab {{ request()->is('agences*') ? 'active' : '' }}">
+        Stations
+    </a>
+    <a href="{{ route('entrepots.index') }}" class="nav-tab {{ request()->is('entrepots*') ? 'active' : '' }}">
+        Entrepôts
+    </a>
+    <a href="{{ route('distributeurs.index') }}" class="nav-tab {{ request()->is('distributeurs*') ? 'active' : '' }}">
+        Distributeurs
+    </a>
+</div>
+
+
     <!-- Barre de recherche et bouton d'ajout -->
     <div class="search-bar">
         <div class="search-group">

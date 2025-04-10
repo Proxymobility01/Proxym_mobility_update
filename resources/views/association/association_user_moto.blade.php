@@ -427,6 +427,34 @@ tr:hover {
     text-overflow: ellipsis;
     flex: 1;
 }
+
+
+
+
+/* Styles pour les tabs */
+.nav-tabs {
+    display: flex;
+    border-bottom: 1px solid #ddd;
+    margin-bottom: 20px;
+}
+
+.nav-tab {
+    padding: 10px 20px;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    margin-right: 10px;
+    
+}
+
+.nav-tab:hover {
+    background-color: var(--tertiary);
+}
+
+.nav-tab.active {
+    border-bottom-color: var(--primary);
+    font-weight: bold;
+}
+
 </style>
 
 @section('content')
@@ -436,11 +464,12 @@ tr:hover {
         <h2>{{ $pageTitle }}</h2>
         <div id="date" class="date"></div>
     </div>
- <!-- Onglets de navigation -->
- <div class="nav-tabs">
-        <div class="nav-tab" data-tab="moto-user">Associations Moto-Utilisateur</div>
-        <div class="nav-tab active" data-tab="battery-user">Associations Batterie-Utilisateur</div>
-    </div>
+ 
+<!-- Onglets de navigation -->
+<div class="nav-tabs">
+    <div class="nav-tab {{ Request::is('associations') || (Request::is('associations/*') && !Request::is('associations/batteries*')) ? 'active' : '' }}" data-tab="moto-user">Associations Moto-Utilisateur</div>
+    <div class="nav-tab {{ Request::is('associations/batteries*') ? 'active' : '' }}" data-tab="battery-user">Associations Batterie-Utilisateur</div>
+</div>
 
     <!-- Barre de recherche et ajout -->
     <div class="search-bar">
@@ -1051,6 +1080,27 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Initialiser les événements des checkboxes
     initCheckboxEvents();
+
+    // Ajoutez ce code dans la section "Attachement des événements" de votre premier fichier (paste.txt)
+// À placer juste après l'initialisation des événements des checkboxes
+
+// Événements pour les onglets
+document.querySelectorAll('.nav-tab').forEach(tab => {
+    tab.addEventListener('click', function() {
+        const tabName = this.getAttribute('data-tab');
+        
+        // Gestion de la navigation par onglets
+        document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+        this.classList.add('active');
+        
+        if (tabName === 'battery-user') {
+            window.location.href = '/associations/batteries'; // Rediriger vers la page des associations batterie-utilisateur
+        }
+    });
+});
+
+
+
 });
 
 

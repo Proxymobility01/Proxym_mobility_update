@@ -21,7 +21,40 @@ body {
 }
 
 
+h1, h2, h3, h4, h5, h6 {
+    font-family: 'Orbitron', sans-serif;
+  }
 
+  
+/* Styles pour les tabs  des navbar*/
+.nav-tabs {
+    display: flex;
+    border-bottom: 1px solid #ddd;
+    margin-bottom: 20px;
+}
+
+.nav-tab {
+    padding: 10px 20px;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    margin-right: 10px;
+    text-decoration: none;
+    font-size: 1.5rem;
+    color: var(--secondary);
+}
+
+.nav-tab:hover {
+    background-color: var(--tertiary);
+}
+
+.nav-tab.active {
+    border-bottom-color: var(--primary);
+    font-weight: bold;
+    color: var(--primary);
+}
+  
+  
+/* Styles pour le dasshboard*/
 .dashboard {
     display: flex;
     min-height: 100vh;

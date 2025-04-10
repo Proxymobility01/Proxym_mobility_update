@@ -492,10 +492,12 @@ tr:hover {
     </div>
 
     <!-- Onglets de navigation -->
-    <div class="nav-tabs">
-        <div class="nav-tab" data-tab="moto-user">Associations Moto-Utilisateur</div>
-        <div class="nav-tab active" data-tab="battery-user">Associations Batterie-Utilisateur</div>
-    </div>
+    
+<!-- Onglets de navigation -->
+<div class="nav-tabs">
+    <div class="nav-tab {{ Request::is('associations') || (Request::is('associations/*') && !Request::is('associations/batteries*')) ? 'active' : '' }}" data-tab="moto-user">Associations Moto-Utilisateur</div>
+    <div class="nav-tab {{ Request::is('associations/batteries*') ? 'active' : '' }}" data-tab="battery-user">Associations Batterie-Utilisateur</div>
+</div>
 
     <!-- Barre de recherche et ajout -->
     <div class="search-bar">
