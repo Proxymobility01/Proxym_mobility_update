@@ -12,6 +12,7 @@ use App\Http\Controllers\Agences\AgenceController;
 use App\Http\Controllers\Entrepots\EntrepotController;
 use App\Http\Controllers\Distributeurs\DistributeurController;
 use App\Http\Controllers\Employes\EmployeController;
+use App\Http\Controllers\Associations\RavitaillementController;
 
 
 Route::get('/', function () {
@@ -267,3 +268,21 @@ Route::prefix('employe')->name('employe.')->group(function () {
 });
     // Public routes (login)
     Route::get('/login', [EmployeController::class, 'showLoginForm'])->name('login');
+
+
+
+
+
+
+
+// Routes pour la page de ravitaillement
+Route::prefix('ravitaillements')->group(function () {
+    Route::get('/', [RavitaillementController::class, 'index'])->name('ravitailler.batteries.index');
+    Route::post('/store', [RavitaillementController::class, 'store'])->name('ravitailler.batteries.store');
+});
+
+// Routes API pour les filtres et statistiques
+Route::prefix('api')->group(function () {
+    Route::post('/ravitaillements/filter', [RavitaillementController::class, 'filter']);
+    Route::post('/ravitaillements/stats', [RavitaillementController::class, 'getStats']);
+});

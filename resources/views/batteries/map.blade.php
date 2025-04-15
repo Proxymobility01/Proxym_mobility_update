@@ -8,6 +8,8 @@
     
     <!-- Font Awesome pour les icônes -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+
     
     <style>
         /* Reset et styles généraux */
@@ -449,7 +451,7 @@
             <h1>Proxym Gestion de Batteries</h1>
         </div>
         <div class="header-actions">
-            <a href="/batteries"><i class="fas fa-list"></i> Liste des batteries</a>
+            <a href="/batteries"><i class="fas fa-bell"></i> Alert</a>
         </div>
     </header>
     
@@ -465,7 +467,7 @@
     
     <!-- Toggle sidebar button (mobile only) -->
     <button class="toggle-sidebar" id="toggle-sidebar">
-        <i class="fas fa-list"></i>
+        <i class="fas fa-bell"></i>
     </button>
     
     <!-- Map container -->

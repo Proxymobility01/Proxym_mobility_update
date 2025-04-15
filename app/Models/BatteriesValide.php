@@ -41,6 +41,14 @@ class BatteriesValide extends Model
         return $this->belongsToMany(ValidatedUser::class, 'battery_moto_user_association');
     }
 
+    
+/**
+ * Relation avec les entrées dans la table battery_agence
+ */
+public function batteryAgences()
+{
+    return $this->hasMany(BatteryAgence::class, 'id_battery_valide');
+}
 
       // Relation avec BatteryEntrepot pour obtenir l'entrepôt associé à la batterie
       public function batteryEntrepots()
