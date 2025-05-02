@@ -12,14 +12,14 @@ class Batterie extends Model
     use SoftDeletes ;
 
     protected $table = 'batteries';
-    protected $primaryKey = 'id'; 
+    protected $primaryKey = 'id';
 
     protected $fillable = [
         'batterie_unique_id',
         'mac_id',
          'date_production',
-         'fabriquant', 
-         'gps', 
+         'fabriquant',
+         'distances',
          'statut',
         ];
 

@@ -292,3 +292,7 @@ Route::prefix('api')->group(function () {
 //bms configurations
 Route::get('/bms/setup', [BmsSetupController::class, 'index'])->name('bms.setup');
 Route::post('/bms/send', [BmsSetupController::class, 'send'])->name('bms.send');
+
+
+//distances
+Route::get('/distances', [App\Http\Controllers\DailyDistanceController::class, 'index'])->name('distances.index');

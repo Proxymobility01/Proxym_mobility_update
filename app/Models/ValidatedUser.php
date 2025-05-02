@@ -3,36 +3,36 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Foundation\Auth\User as Authenticatable; 
+use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
 use Illuminate\Support\Facades\Auth;
 
-class ValidatedUser extends Authenticatable 
+class ValidatedUser extends Authenticatable
 {
     use HasFactory, HasApiTokens, Notifiable;
 
     protected $guarded = [];
-    
+
     protected $fillable = [
         'user_unique_id',
-        'nom', 
-        'prenom', 
-        'email', 
-        'phone', 
+        'nom',
+        'prenom',
+        'email',
+        'phone',
         'password',
         'token',
-        'numero_cni', 
-        'photo_cni_recto', 
-        'photo_cni_verso', 
+        'numero_cni',
+        'photo_cni_recto',
+        'photo_cni_verso',
         'photo',
-        'status', 
+        'status',
         'link_expiration',
-        'verification_code',         
-        'verification_code_sent_at',  
-        'completed_at',            
+        'verification_code',
+        'verification_code_sent_at',
+        'completed_at',
     ];
 
     protected $hidden = [
@@ -72,17 +72,35 @@ class ValidatedUser extends Authenticatable
     {
         return $this->hasMany(Swap::class);
     }
-    
-    
 
-      /**
+
+    public function moto()
+    {
+        return $this->hasOneThrough(
+            \App\Models\MotosValide::class,
+            \App\Models\AssociationUserMoto::class,
+            'validated_user_id',   // Foreign key on association_user_motos
+            'id',                  // Foreign key on motos_valides
+            'id',                  // Local key on validated_users
+            'moto_valide_id'       // Local key on association_user_motos
+        );
+    }
+
+    public function distances()
+    {
+        return $this->hasMany(\App\Models\DailyDistance::class);
+    }
+
+
+
+    /**
      * Authenticate the user with the provided credentials.
      *
      * @param array $credentials
      * @return bool
      * @throws ValidationException
      */
-  
-    
-    
+
+
+
 }

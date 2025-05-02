@@ -452,7 +452,7 @@ document.addEventListener('DOMContentLoaded', function() {
                      <button class="action-btn bms" title="Données BMS">
                                     <i class="fas fa-chart-line"></i>
                     </button>
-                    
+
                 </td>
             `;
             batteriesTableBody.appendChild(row);
@@ -513,7 +513,7 @@ document.addEventListener('DOMContentLoaded', function() {
             .then(batterie => {
                 document.getElementById('edit-batterie-id').value = batterie.id;
                 document.getElementById('edit-fabriquant').value = batterie.fabriquant;
-                document.getElementById('edit-gps').value = batterie.gps;
+                document.getElementById('edit-distances').value = batterie.gps;
                 document.getElementById('edit-date_production').value = batterie.date_production ? batterie
                     .date_production.split('T')[0] : '';
                 editBatterieModal.classList.add('active');

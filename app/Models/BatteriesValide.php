@@ -16,11 +16,11 @@ class BatteriesValide extends Model
         'mac_id',
         'date_production',
         'fabriquant',
-        'gps',
+        'distances',
         'statut',
     ];
 
- 
+
 
 
     // Relation many-to-many avec MotosValide via la table pivot 'battery_moto_user_association'
@@ -33,7 +33,7 @@ class BatteriesValide extends Model
             'association_user_moto_id' // Clé étrangère vers AssociationUserMoto
         )->using(AssociationUserMoto::class); // Associer avec la table intermédiaire si nécessaire
     }
-    
+
 
     // Relation many-to-many avec les utilisateurs via la table pivot 'battery_moto_user_association'
     public function users()
@@ -41,7 +41,7 @@ class BatteriesValide extends Model
         return $this->belongsToMany(ValidatedUser::class, 'battery_moto_user_association');
     }
 
-    
+
 /**
  * Relation avec les entrées dans la table battery_agence
  */
@@ -55,7 +55,7 @@ public function batteryAgences()
       {
           return $this->hasMany(BatteryEntrepot::class, 'id_battery_valide');
       }
-  
+
 
 
     // Dans le modèle BatteriesValide :
