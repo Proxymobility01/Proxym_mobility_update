@@ -77,8 +77,6 @@ class MotoController extends Controller
             return response()->json(['error' => 'Erreur de récupération'], 500);
         }
     }
-    
-    
 
     // Ajouter une moto (support AJAX)
     public function store(Request $request)
@@ -113,7 +111,7 @@ class MotoController extends Controller
             return response()->json($moto, 201);
         } catch (Exception $e) {
             Log::error("Erreur lors de l'ajout de la moto : " . $e->getMessage());
-            return response()->json(['error' => 'Erreur d\'ajout'], 500);
+            return response()->json(['error' => $e->getMessage()], 500);
         }
     }
 
@@ -137,12 +135,12 @@ class MotoController extends Controller
             return response()->json($moto);
         } catch (Exception $e) {
             Log::error("Erreur lors de la mise à jour de la moto : " . $e->getMessage());
-            return response()->json(['error' => 'Erreur de mise à jour'], 500);
+            return response()->json(['error' => $e->getMessage()], 500);
         }
     }
 
-    // Valider une moto
-    public function validate(Request $request, $id)
+    // Valider une moto (renommé validateMoto pour éviter le conflit avec la méthode PHP validate)
+    public function validateMoto(Request $request, $id)
     {
         try {
             $moto = Moto::findOrFail($id);
@@ -169,7 +167,7 @@ class MotoController extends Controller
             return response()->json($motoValidee);
         } catch (Exception $e) {
             Log::error("Erreur lors de la validation de la moto : " . $e->getMessage());
-            return response()->json(['error' => 'Erreur de validation'], 500);
+            return response()->json(['error' => $e->getMessage()], 500);
         }
     }
 
@@ -184,7 +182,7 @@ class MotoController extends Controller
             return response()->json($moto);
         } catch (Exception $e) {
             Log::error("Erreur lors du rejet de la moto : " . $e->getMessage());
-            return response()->json(['error' => 'Erreur de rejet'], 500);
+            return response()->json(['error' => $e->getMessage()], 500);
         }
     }
 
@@ -198,7 +196,7 @@ class MotoController extends Controller
             return response()->json(['message' => 'Moto supprimée']);
         } catch (Exception $e) {
             Log::error("Erreur lors de la suppression de la moto : " . $e->getMessage());
-            return response()->json(['error' => 'Erreur de suppression'], 500);
+            return response()->json(['error' => $e->getMessage()], 500);
         }
     }
 }

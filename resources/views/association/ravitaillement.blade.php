@@ -281,6 +281,28 @@ tr:hover {
         <div id="date" class="date"></div>
     </div>
 
+   <!-- Onglets de navigation -->
+<div class="nav-tabs">
+    <div class="nav-tab {{ Request::is('associations') || (Request::is('associations/*') && !Request::is('associations/batteries*')) ? 'active' : '' }}"
+         data-tab="moto-user"
+         data-url="{{ route('associations.index') }}">
+        Associations Moto-Utilisateur
+    </div>
+
+    <div class="nav-tab {{ Request::is('associations/batteries*') ? 'active' : '' }}"
+         data-tab="battery-user"
+         data-url="{{ route('associations.batteries.index') }}">
+        Associations Batterie-Utilisateur
+    </div>
+
+    <div class="nav-tab {{ Request::is('ravitaillements') || Request::is('ravitaillements/*') ? 'active' : '' }}"
+         data-tab="ravitaillement"
+         data-url="{{ route('ravitailler.batteries.index') }}">
+        Ravitailler Une Station
+    </div>
+</div>
+
+
     <!-- Cartes des statistiques -->
     <div class="stats-grid">
         <div class="stat-card total">
@@ -760,6 +782,22 @@ document.addEventListener('click', function(e) {
         modal.show();
     }
 });
+
+
+
+// Événements pour les onglets
+
+    document.querySelectorAll('.nav-tab').forEach(tab => {
+        tab.addEventListener('click', function () {
+            const url = this.getAttribute('data-url');
+            if (url) {
+                window.location.href = url;
+            }
+        });
+    });
+
+
+    
 </script>
 
 

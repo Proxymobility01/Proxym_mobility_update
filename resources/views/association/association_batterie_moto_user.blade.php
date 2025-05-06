@@ -495,9 +495,25 @@ tr:hover {
     
 <!-- Onglets de navigation -->
 <div class="nav-tabs">
-    <div class="nav-tab {{ Request::is('associations') || (Request::is('associations/*') && !Request::is('associations/batteries*')) ? 'active' : '' }}" data-tab="moto-user">Associations Moto-Utilisateur</div>
-    <div class="nav-tab {{ Request::is('associations/batteries*') ? 'active' : '' }}" data-tab="battery-user">Associations Batterie-Utilisateur</div>
+    <div class="nav-tab {{ Request::is('associations') || (Request::is('associations/*') && !Request::is('associations/batteries*')) ? 'active' : '' }}"
+         data-tab="moto-user"
+         data-url="{{ route('associations.index') }}">
+        Associations Moto-Utilisateur
+    </div>
+
+    <div class="nav-tab {{ Request::is('associations/batteries*') ? 'active' : '' }}"
+         data-tab="battery-user"
+         data-url="{{ route('associations.batteries.index') }}">
+        Associations Batterie-Utilisateur
+    </div>
+
+    <div class="nav-tab {{ Request::is('ravitaillements') || Request::is('ravitaillements/*') ? 'active' : '' }}"
+         data-tab="ravitaillement"
+         data-url="{{ route('ravitailler.batteries.index') }}">
+        Ravitailler Une Station
+    </div>
 </div>
+
 
     <!-- Barre de recherche et ajout -->
     <div class="search-bar">
@@ -1372,19 +1388,13 @@ function openEditAssociationModal(row) {
     
     // Événements pour les onglets
     document.querySelectorAll('.nav-tab').forEach(tab => {
-        tab.addEventListener('click', function() {
-            const tabName = this.getAttribute('data-tab');
-            
-            // Gestion de la navigation par onglets
-            document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
-            this.classList.add('active');
-            
-            if (tabName === 'moto-user') {
-                window.location.href = '/associations'; // Rediriger vers la page des associations moto-utilisateur
+        tab.addEventListener('click', function () {
+            const url = this.getAttribute('data-url');
+            if (url) {
+                window.location.href = url;
             }
         });
     });
-    
     // ------------------------------------------------------------
     // Initialisation
     // ------------------------------------------------------------

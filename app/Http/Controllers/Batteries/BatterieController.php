@@ -29,7 +29,7 @@ class BatterieController extends Controller
                         return $query->where(function($q) use ($search) {
                             $q->where('fabriquant', 'LIKE', '%' . $search . '%')
                               ->orWhere('mac_id', 'LIKE', '%' . $search . '%')
-                              ->orWhere('distances', 'LIKE', '%' . $search . '%');
+                              ->orWhere('gps', 'LIKE', '%' . $search . '%');
                         });
                     })->get()->map(function($batterie) {
                         $batterie->statut = 'validé';
@@ -42,7 +42,7 @@ class BatterieController extends Controller
                             return $query->where(function($q) use ($search) {
                                 $q->where('fabriquant', 'LIKE', '%' . $search . '%')
                                   ->orWhere('mac_id', 'LIKE', '%' . $search . '%')
-                                  ->orWhere('distances', 'LIKE', '%' . $search . '%');
+                                  ->orWhere('gps', 'LIKE', '%' . $search . '%');
                             });
                         })->get();
                 }
@@ -52,14 +52,14 @@ class BatterieController extends Controller
                     return $query->where(function($q) use ($search) {
                         $q->where('fabriquant', 'LIKE', '%' . $search . '%')
                           ->orWhere('mac_id', 'LIKE', '%' . $search . '%')
-                          ->orWhere('distances', 'LIKE', '%' . $search . '%');
+                          ->orWhere('gps', 'LIKE', '%' . $search . '%');
                     });
                 })->get();
                 $batteriesValidees = BatteriesValide::when($search, function($query, $search) {
                     return $query->where(function($q) use ($search) {
                         $q->where('fabriquant', 'LIKE', '%' . $search . '%')
                           ->orWhere('mac_id', 'LIKE', '%' . $search . '%')
-                          ->orWhere('distances', 'LIKE', '%' . $search . '%');
+                          ->orWhere('gps', 'LIKE', '%' . $search . '%');
                     });
                 })->get()->map(function($batterie) {
                     $batterie->statut = 'validé';
@@ -70,9 +70,9 @@ class BatterieController extends Controller
 
             // 1) Peupler les données BMS pour chaque batterie (stateData, setingData, etc.)
             foreach ($batteries as $battery) {
-                $this->populateBatteryData($battery);
+                $this->populateBatteryData($battery); 
                 // 2) Récupérer le SOC si disponible
-                $battery->soc = $battery->stateData['SOC'] ?? 0;
+                $battery->soc = $battery->stateData['SOC'] ?? 0; 
             }
 
             if ($request->wantsJson()) {
@@ -138,7 +138,7 @@ class BatterieController extends Controller
             $validatedData = $request->validate([
                 'mac_id' => 'required|unique:batteries,mac_id',
                 'fabriquant' => 'required',
-                'distances' => 'required',
+                'gps' => 'required',
                 'date_production' => 'nullable|date',
             ]);
 
@@ -153,7 +153,7 @@ class BatterieController extends Controller
             $batterie = Batterie::create([
                 'mac_id' => $validatedData['mac_id'],
                 'fabriquant' => $validatedData['fabriquant'],
-                'distances' => $validatedData['distances'],
+                'gps' => $validatedData['gps'],
                 'date_production' => $validatedData['date_production'],
                 'batterie_unique_id' => $uniqueId,
                 'statut' => 'en attente'
@@ -172,12 +172,12 @@ class BatterieController extends Controller
             $batterie = Batterie::findOrFail($id);
             $validatedData = $request->validate([
                 'fabriquant' => 'required',
-                'distances' => 'required',
+                'gps' => 'required',
                 'date_production' => 'nullable|date',
             ]);
             $batterie->update([
                 'fabriquant' => $validatedData['fabriquant'],
-                'distances' => $validatedData['distances'],
+                'gps' => $validatedData['gps'],
                 'date_production' => $validatedData['date_production'],
                 'statut' => 'en attente'
             ]);
@@ -202,7 +202,7 @@ class BatterieController extends Controller
                 'mac_id' => $batterie->mac_id,
                 'batterie_unique_id' => $batterie->batterie_unique_id,
                 'fabriquant' => $batterie->fabriquant,
-                'distances' => $batterie->gps,
+                'gps' => $batterie->gps,
                 'date_production' => $batterie->date_production,
                 'capacite' => $validatedData['capacite'],
                 'tension' => $validatedData['tension'],
@@ -281,20 +281,20 @@ class BatterieController extends Controller
             // Utiliser le cache pour 2 minutes (durée courte pour garder les données fraîches)
             $result = Cache::remember('batteries_map_data', 120, function () {
                 // Récupérer toutes les batteries validées (cette requête est rapide)
-                $batteriesValidees = BatteriesValide::select(['id', 'mac_id', 'batterie_unique_id', 'fabriquant', 'distances'])
+                $batteriesValidees = BatteriesValide::select(['id', 'mac_id', 'batterie_unique_id', 'fabriquant', 'gps'])
                     ->get();
-
+                
                 if ($batteriesValidees->isEmpty()) {
                     return [];
                 }
-
+                
                 // Collecter tous les mac_id pour la requête suivante
                 $macIds = $batteriesValidees->pluck('mac_id')->toArray();
-
+                
                 // Requête optimisée utilisant une sous-requête SQL pour obtenir les données BMS les plus récentes
                 // Ceci évite de faire une requête par batterie, ce qui améliore considérablement les performances
                 $latestBmsData = DB::select('
-                    SELECT b.*
+                    SELECT b.* 
                     FROM bms_data b
                     INNER JOIN (
                         SELECT mac_id, MAX(timestamp) as latest_timestamp
@@ -303,29 +303,29 @@ class BatterieController extends Controller
                         GROUP BY mac_id
                     ) m ON b.mac_id = m.mac_id AND b.timestamp = m.latest_timestamp
                 ', $macIds);
-
+                
                 // Créer un tableau indexé par mac_id pour accès rapide
                 $bmsDataByMacId = [];
                 foreach ($latestBmsData as $data) {
                     $bmsDataByMacId[$data->mac_id] = $data;
                 }
-
+                
                 // Construire le tableau final des batteries avec leurs données BMS
                 $result = [];
                 foreach ($batteriesValidees as $battery) {
                     if (isset($bmsDataByMacId[$battery->mac_id])) {
                         $bmsData = $bmsDataByMacId[$battery->mac_id];
-
+                        
                         // Vérifier si nous avons des coordonnées valides
                         if ($bmsData->latitude && $bmsData->longitude) {
                             $stateData = json_decode($bmsData->state, true);
-
+                            
                             $result[] = [
                                 'id' => $battery->id,
                                 'mac_id' => $battery->mac_id,
                                 'unique_id' => $battery->batterie_unique_id,
                                 'fabriquant' => $battery->fabriquant ?? 'Inconnu',
-                                'distances' => $battery->gps ?? 'Inconnu',
+                                'gps' => $battery->gps ?? 'Inconnu',
                                 'soc' => $stateData['SOC'] ?? 0,
                                 'status' => $this->getBatteryStatus($stateData['WorkStatus'] ?? '3'),
                                 'latitude' => $bmsData->longitude,
@@ -335,17 +335,17 @@ class BatterieController extends Controller
                         }
                     }
                 }
-
+                
                 return $result;
             });
-
+            
             return response()->json($result);
         } catch (Exception $e) {
             Log::error("Erreur lors de la récupération des données des batteries : " . $e->getMessage());
             return response()->json(['error' => 'Erreur lors de la récupération des données: ' . $e->getMessage()], 500);
         }
     }
-
+    
     /**
      * API endpoint pour récupérer les mises à jour récentes
      */
@@ -354,7 +354,7 @@ class BatterieController extends Controller
         try {
             // Par défaut, récupérer les données mises à jour depuis les 30 dernières secondes
             $since = $request->query('since', now()->subSeconds(30)->toDateTimeString());
-
+            
             // Requête optimisée pour récupérer uniquement les batteries qui ont des mises à jour récentes
             $recentlyUpdatedMacIds = DB::table('bms_data')
                 ->select('mac_id')
@@ -362,25 +362,25 @@ class BatterieController extends Controller
                 ->groupBy('mac_id')
                 ->pluck('mac_id')
                 ->toArray();
-
+            
             if (empty($recentlyUpdatedMacIds)) {
                 return response()->json([]);
             }
-
+            
             // Récupérer les informations de base des batteries
-            $batteries = BatteriesValide::select(['id', 'mac_id', 'batterie_unique_id', 'fabriquant', 'distances'])
+            $batteries = BatteriesValide::select(['id', 'mac_id', 'batterie_unique_id', 'fabriquant', 'gps'])
                 ->whereIn('mac_id', $recentlyUpdatedMacIds)
                 ->get();
-
+            
             if ($batteries->isEmpty()) {
                 return response()->json([]);
             }
-
+            
             $batteryMacIds = $batteries->pluck('mac_id')->toArray();
-
+            
             // Récupérer les dernières données BMS pour ces batteries
             $latestBmsData = DB::select('
-                SELECT b.*
+                SELECT b.* 
                 FROM bms_data b
                 INNER JOIN (
                     SELECT mac_id, MAX(timestamp) as latest_timestamp
@@ -389,22 +389,22 @@ class BatterieController extends Controller
                     GROUP BY mac_id
                 ) m ON b.mac_id = m.mac_id AND b.timestamp = m.latest_timestamp
             ', $batteryMacIds);
-
+            
             // Indexer par mac_id
             $bmsDataByMacId = [];
             foreach ($latestBmsData as $data) {
                 $bmsDataByMacId[$data->mac_id] = $data;
             }
-
+            
             // Construire les données de mise à jour
             $updates = [];
             foreach ($batteries as $battery) {
                 if (isset($bmsDataByMacId[$battery->mac_id])) {
                     $bmsData = $bmsDataByMacId[$battery->mac_id];
-
+                    
                     if ($bmsData->latitude && $bmsData->longitude) {
                         $stateData = json_decode($bmsData->state, true);
-
+                        
                         $updates[] = [
                             'id' => $battery->id,
                             'mac_id' => $battery->mac_id,
@@ -418,19 +418,19 @@ class BatterieController extends Controller
                     }
                 }
             }
-
+            
             // Invalider le cache si des mises à jour sont disponibles
             if (!empty($updates)) {
                 Cache::forget('batteries_map_data');
             }
-
+            
             return response()->json($updates);
         } catch (Exception $e) {
             Log::error("Erreur lors de la récupération des mises à jour : " . $e->getMessage());
             return response()->json(['error' => 'Erreur lors de la récupération des mises à jour: ' . $e->getMessage()], 500);
         }
     }
-
+    
     /**
      * Convertit le code de statut de travail en texte lisible
      */
@@ -442,7 +442,7 @@ class BatterieController extends Controller
             '2' => 'En décharge',
             '3' => 'En veille'
         ];
-
+        
         return $statuses[$statusCode] ?? 'Inconnu';
     }
 }

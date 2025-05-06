@@ -76,4 +76,14 @@
         <i class="fas fa-cog"></i>
         <span>Paramètres</span>
     </div>
+    <div class="nav-item" onclick="event.preventDefault(); document.getElementById('logout-form').submit();" style="cursor: pointer;">
+    <i class="fas fa-sign-out-alt"></i>
+    <span>Déconnexion</span>
+
+    <form id="logout-form" action="{{ route('logout') }}" method="POST" style="display: none;">
+        @csrf
+    </form>
+</div>
+
+   
 </div>

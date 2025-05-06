@@ -12,7 +12,16 @@ class Kernel extends ConsoleKernel
      */
     protected $commands = [
         \App\Console\Commands\CalculateDailyDistances::class,
+
+
     ];
+
+    protected $routeMiddleware = [
+        'auth' => \App\Http\Middleware\Authenticate::class,
+        'check.employe' => \App\Http\Middleware\CheckEmployeSession::class,
+        // ... autres middlewares
+    ];
+    
 
     /**
      * Define the application's command schedule.

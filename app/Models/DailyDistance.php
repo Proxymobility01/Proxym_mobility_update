@@ -9,16 +9,24 @@ class DailyDistance extends Model
 {
     use HasFactory;
 
+    protected $table = 'daily_distances'; // si tu veux être explicite
+
     protected $fillable = [
-        'validated_user_id',
+        'user_id', // clé étrangère vers ValidatedUser
         'date',
         'total_distance_km',
+        'last_location',
+        'last_updated',
     ];
 
+    // Active timestamps (Laravel le fait déjà par défaut, mais on le précise ici)
+    public $timestamps = true;
+
+    /**
+     * Relation avec l'utilisateur validé.
+     */
     public function user()
     {
-        return $this->belongsTo(ValidatedUser::class, 'validated_user_id');
+        return $this->belongsTo(ValidatedUser::class, 'user_id');
     }
-
-
 }
