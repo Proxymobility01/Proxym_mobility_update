@@ -378,5 +378,6 @@ class LocalisationController extends Controller
             ['lat' => 4.1245431, 'lng' => 9.624815],
             ['lat' => 4.1164959, 'lng' => 9.6133137]
         ];
+        
     }
 }

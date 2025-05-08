@@ -113,7 +113,7 @@
     margin-bottom: 10px;
 }
 
-.date-picker-container, .date-range-container, .time-range-container {
+.date-picker-container, .date-range-container {
     display: none;
     margin-left: 10px;
     margin-bottom: 10px;
@@ -185,7 +185,7 @@ tr:hover {
 /* Content header */
 .content-header {
     display: flex;
-    justify-content: space-between;
+    justify-content: space-justify-content: space-between;
     align-items: center;
     margin-bottom: 20px;
 }
@@ -357,23 +357,6 @@ tr:hover {
                 <input type="date" id="start-date" value="{{ now()->subDays(7)->toDateString() }}">
                 <input type="date" id="end-date" value="{{ now()->toDateString() }}">
             </div>
-            
-            <select id="distance-filter">
-                <option value="all">Toutes les distances</option>
-                <option value="0-10">0-10 KM</option>
-                <option value="10-50">10-50 KM</option>
-                <option value="50-100">50-100 KM</option>
-                <option value="100+">100+ KM</option>
-            </select>
-            
-            <button id="show-time-filter" class="export-btn" style="background-color: var(--tertiary); color: var(--secondary); padding: 6px 12px; margin-left: 10px;">
-                <i class="fas fa-clock mr-2"></i> Filtre horaire
-            </button>
-            
-            <div id="time-range-container" class="time-range-container">
-                <input type="time" id="start-time" value="{{ $startTime ?? '00:00' }}">
-                <input type="time" id="end-time" value="{{ $endTime ?? '23:59' }}">
-            </div>
         </div>
     </div>
 
@@ -402,6 +385,7 @@ tr:hover {
                             <th>ID Chauffeur</th>
                             <th>Nom du Chauffeur</th>
                             <th>Téléphone</th>
+                            <th>Date</th>
                             <th>Distance (KM)</th>
                             <th>Dernière Position</th>
                             <th>Statut</th>
@@ -413,6 +397,7 @@ tr:hover {
                                 <td>{{ $distance->user->id }}</td>
                                 <td>{{ $distance->user->prenom ?? '' }} {{ $distance->user->nom ?? 'N/A' }}</td>
                                 <td>{{ $distance->user->phone ?? 'N/A' }}</td>
+                                <td>{{ \Carbon\Carbon::parse($distance->date)->format('d/m/Y') }}</td>
                                 <td>{{ number_format($distance->total_distance_km, 2) }}</td>
                                 <td>{{ $distance->last_location ?? 'N/A' }}</td>
                                 <td>
@@ -445,16 +430,11 @@ document.addEventListener('DOMContentLoaded', function() {
     const searchInput = document.getElementById('search-driver');
     const driverFilter = document.getElementById('driver-filter');
     const timeFilter = document.getElementById('time-filter');
-    const distanceFilter = document.getElementById('distance-filter');
     const customDatePicker = document.getElementById('custom-date');
     const datePickerContainer = document.getElementById('date-picker-container');
     const startDatePicker = document.getElementById('start-date');
     const endDatePicker = document.getElementById('end-date');
     const dateRangeContainer = document.getElementById('date-range-container');
-    const showTimeFilterBtn = document.getElementById('show-time-filter');
-    const timeRangeContainer = document.getElementById('time-range-container');
-    const startTimePicker = document.getElementById('start-time');
-    const endTimePicker = document.getElementById('end-time');
     const distancesContent = document.getElementById('distances-content');
     const recalculateBtn = document.getElementById('recalculateBtn');
     
@@ -465,19 +445,6 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Variables pour stocker les données actuelles
     let currentDistances = [];
-    
-    // Afficher/masquer le sélecteur d'heure
-    if (showTimeFilterBtn) {
-        showTimeFilterBtn.addEventListener('click', function() {
-            if (timeRangeContainer.style.display === 'none' || timeRangeContainer.style.display === '') {
-                timeRangeContainer.style.display = 'block';
-                this.innerHTML = '<i class="fas fa-clock mr-2"></i> Masquer filtre horaire';
-            } else {
-                timeRangeContainer.style.display = 'none';
-                this.innerHTML = '<i class="fas fa-clock mr-2"></i> Filtre horaire';
-            }
-        });
-    }
     
     // Gérer l'affichage des sélecteurs de date
     if (timeFilter) {
@@ -517,10 +484,6 @@ document.addEventListener('DOMContentLoaded', function() {
         driverFilter.addEventListener('change', filterDistances);
     }
     
-    if (distanceFilter) {
-        distanceFilter.addEventListener('change', filterDistances);
-    }
-    
     if (customDatePicker) {
         customDatePicker.addEventListener('change', filterDistances);
     }
@@ -531,14 +494,6 @@ document.addEventListener('DOMContentLoaded', function() {
     
     if (endDatePicker) {
         endDatePicker.addEventListener('change', filterDistances);
-    }
-    
-    if (startTimePicker) {
-        startTimePicker.addEventListener('change', filterDistances);
-    }
-    
-    if (endTimePicker) {
-        endTimePicker.addEventListener('change', filterDistances);
     }
     
     // Événements pour les boutons d'exportation
@@ -565,21 +520,15 @@ document.addEventListener('DOMContentLoaded', function() {
         const searchTerm = searchInput ? searchInput.value : '';
         const driver = driverFilter ? driverFilter.value : 'all';
         const time = timeFilter ? timeFilter.value : 'today';
-        const distance = distanceFilter ? distanceFilter.value : 'all';
         const customDate = customDatePicker ? customDatePicker.value : '';
         const startDate = startDatePicker ? startDatePicker.value : '';
         const endDate = endDatePicker ? endDatePicker.value : '';
-        const startTime = startTimePicker ? startTimePicker.value : '00:00';
-        const endTime = endTimePicker ? endTimePicker.value : '23:59';
         
         // Préparer les données à envoyer
         const data = {
             search: searchTerm,
             driver: driver,
-            time_filter: time,
-            distance_filter: distance,
-            start_time: startTime,
-            end_time: endTime
+            time_filter: time
         };
         
         // Ajouter les dates spécifiques si nécessaire
@@ -637,14 +586,10 @@ document.addEventListener('DOMContentLoaded', function() {
         const customDate = customDatePicker ? customDatePicker.value : '';
         const startDate = startDatePicker ? startDatePicker.value : '';
         const endDate = endDatePicker ? endDatePicker.value : '';
-        const startTime = startTimePicker ? startTimePicker.value : '00:00';
-        const endTime = endTimePicker ? endTimePicker.value : '23:59';
         
         // Préparer les données à envoyer
         const data = {
-            time_filter: time,
-            start_time: startTime,
-            end_time: endTime
+            time_filter: time
         };
         
         // Ajouter les dates spécifiques si nécessaire
@@ -706,6 +651,7 @@ document.addEventListener('DOMContentLoaded', function() {
                             <th>ID Chauffeur</th>
                             <th>Nom du Chauffeur</th>
                             <th>Téléphone</th>
+                            <th>Date</th>
                             <th>Distance (KM)</th>
                             <th>Dernière Position</th>
                             <th>Statut</th>
@@ -724,11 +670,16 @@ document.addEventListener('DOMContentLoaded', function() {
                 statusBadge = '<span class="badge bg-danger">Faible activité</span>';
             }
             
+            // Formater la date
+            const dateParts = distance.date ? distance.date.split('-') : [];
+            const formattedDate = dateParts.length === 3 ? `${dateParts[2]}/${dateParts[1]}/${dateParts[0]}` : '';
+            
             tableHTML += `
                 <tr>
                     <td>${distance.id}</td>
                     <td>${distance.name}</td>
                     <td>${distance.phone}</td>
+                    <td>${formattedDate}</td>
                     <td>${distance.distance_km}</td>
                     <td>${distance.last_location}</td>
                     <td>${statusBadge}</td>
@@ -751,10 +702,15 @@ document.addEventListener('DOMContentLoaded', function() {
         
         if (distances && distances.length > 0) {
             distances.forEach(distance => {
+                // Formater la date
+                const dateParts = distance.date ? distance.date.split('-') : [];
+                const formattedDate = dateParts.length === 3 ? `${dateParts[2]}/${dateParts[1]}/${dateParts[0]}` : '';
+                
                 currentDistances.push({
                     'ID Chauffeur': distance.id,
                     'Nom du Chauffeur': distance.name,
                     'Téléphone': distance.phone,
+                    'Date': formattedDate,
                     'Distance (KM)': distance.distance_km,
                     'Dernière Position': distance.last_location,
                     'Statut': distance.status
@@ -769,9 +725,10 @@ document.addEventListener('DOMContentLoaded', function() {
                     'ID Chauffeur': cells[0].textContent,
                     'Nom du Chauffeur': cells[1].textContent,
                     'Téléphone': cells[2].textContent,
-                    'Distance (KM)': cells[3].textContent,
-                    'Dernière Position': cells[4].textContent,
-                    'Statut': cells[5].textContent.trim()
+                    'Date': cells[3].textContent,
+                    'Distance (KM)': cells[4].textContent,
+                    'Dernière Position': cells[5].textContent,
+                    'Statut': cells[6].textContent.trim()
                 });
             });
         }
@@ -824,6 +781,7 @@ document.addEventListener('DOMContentLoaded', function() {
             item['ID Chauffeur'],
             item['Nom du Chauffeur'],
             item['Téléphone'],
+            item['Date'],
             item['Distance (KM)'],
             item['Dernière Position'],
             item['Statut']
@@ -833,6 +791,7 @@ document.addEventListener('DOMContentLoaded', function() {
             'ID Chauffeur',
             'Nom',
             'Téléphone',
+            'Date',
             'Distance (KM)',
             'Dernière Position',
             'Statut'
