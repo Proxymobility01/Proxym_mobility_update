@@ -327,7 +327,8 @@ class DailyDistanceController extends Controller
                 'hourly_distribution' => [],
                 'created_at' => $distance->created_at->format('Y-m-d H:i:s'),
                 'updated_at' => $distance->updated_at->format('Y-m-d H:i:s'),
-                'date' => $distance->date
+                'date' => $distance->updated_at->format('Y-m-d'), // Date formatée à partir de updated_at
+                'time' => $distance->updated_at->format('H:i:s'), // Heure formatée à partir de updated_at
             ];
         }
         
@@ -428,7 +429,8 @@ class DailyDistanceController extends Controller
                     'user_id' => $distance->user_id,
                     'distance' => $distance->total_distance_km,
                     'last_location' => $distance->last_location,
-                    'date' => $distance->date
+                    'date' => $distance->date,
+                    'updated_at' => $distance->updated_at->format('Y-m-d H:i:s'), // Ajout de la date de mise à jour
                 ];
             }
             

@@ -7,6 +7,7 @@ use Illuminate\Http\Request;
 use App\Models\ValidatedUser;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Carbon\Carbon;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
 
@@ -49,6 +50,8 @@ class ChauffeurController extends Controller
     /**
      * Store a newly created chauffeur in storage.
      */
+ 
+    
     public function store(Request $request)
     {
         $validator = Validator::make($request->all(), [
@@ -62,47 +65,63 @@ class ChauffeurController extends Controller
             'photo_cni_verso' => 'nullable|image|mimes:jpeg,png,jpg|max:8048',
             'photo' => 'nullable|image|mimes:jpeg,png,jpg|max:8048',
         ]);
-
+    
         if ($validator->fails()) {
             return response()->json(['errors' => $validator->errors()], 422);
         }
-
+    
+        // Génération de l'ID unique
+        $prefix = 'UserPX';
+        $currentMonth = Carbon::now()->format('Ym'); // ex: 202505
+    
+        $dernier = ValidatedUser::where('user_unique_id', 'like', "{$prefix}{$currentMonth}%")
+            ->orderBy('user_unique_id', 'desc')
+            ->first();
+    
+        $dernierNumero = 0;
+        if ($dernier) {
+            $dernierNumero = (int) substr($dernier->user_unique_id, -3);
+        }
+    
+        $nouveauNumero = str_pad($dernierNumero + 1, 3, '0', STR_PAD_LEFT);
+        $user_unique_id = "{$prefix}{$currentMonth}{$nouveauNumero}";
+    
         $chauffeur = new ValidatedUser();
-        $chauffeur->user_unique_id = 'CH'.Str::random(8);
+        $chauffeur->user_unique_id = $user_unique_id;
         $chauffeur->nom = $request->nom;
         $chauffeur->prenom = $request->prenom;
         $chauffeur->email = $request->email;
         $chauffeur->phone = $request->phone;
-        $chauffeur->password = $request->password; // Le hachage est géré dans le modèle
+        $chauffeur->password = $request->password; // Hashed in model (assumed)
         $chauffeur->numero_cni = $request->numero_cni;
         $chauffeur->status = 'en attente';
         $chauffeur->token = Str::random(60);
         $chauffeur->verification_code = rand(100000, 999999);
         $chauffeur->verification_code_sent_at = now();
-
-        // Gestion des fichiers (photos)
+    
         if ($request->hasFile('photo_cni_recto')) {
             $filename = 'cni_recto_' . time() . '.' . $request->photo_cni_recto->extension();
             $request->photo_cni_recto->storeAs('public/chauffeurs/cni', $filename);
             $chauffeur->photo_cni_recto = $filename;
         }
-
+    
         if ($request->hasFile('photo_cni_verso')) {
             $filename = 'cni_verso_' . time() . '.' . $request->photo_cni_verso->extension();
             $request->photo_cni_verso->storeAs('public/chauffeurs/cni', $filename);
             $chauffeur->photo_cni_verso = $filename;
         }
-
+    
         if ($request->hasFile('photo')) {
             $filename = 'photo_' . time() . '.' . $request->photo->extension();
             $request->photo->storeAs('public/chauffeurs/photos', $filename);
             $chauffeur->photo = $filename;
         }
-
+    
         $chauffeur->save();
-
+    
         return response()->json($chauffeur, 201);
     }
+    
 
     /**
      * Display the specified chauffeur for editing.

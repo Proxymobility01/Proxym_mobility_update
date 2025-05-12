@@ -89,16 +89,23 @@ class MotoController extends Controller
             ]);
 
             // Génération de l'ID unique
-            $today = Carbon::now()->format('Ymd');
-            $lastMoto = Moto::where('moto_unique_id', 'like', 'PXM' . $today . '%')
-                            ->orderBy('moto_unique_id', 'desc')
-                            ->first();
+            $moto = DB::transaction(function () use ($validatedData) {
+                $today = Carbon::now()->format('Ymd');
+    
+                // Lock les lignes concernées
+                $lastMoto = DB::table('motos')
+                    ->where('moto_unique_id', 'like', 'PXM' . $today . '%')
+                    ->orderBy('moto_unique_id', 'desc')
+                    ->lockForUpdate()
+                    ->first();
+    
+                $counter = $lastMoto
+                    ? (int)substr($lastMoto->moto_unique_id, -3) + 1
+                    : 1;
+    
+                $uniqueId = 'PXM' . $today . str_pad($counter, 3, '0', STR_PAD_LEFT);
+    
 
-            $counter = $lastMoto 
-                ? (int)substr($lastMoto->moto_unique_id, -3) + 1 
-                : 1;
-
-            $uniqueId = 'PXM' . $today . str_pad($counter, 3, '0', STR_PAD_LEFT);
 
             $moto = Moto::create([
                 'vin' => $validatedData['vin'],
@@ -107,6 +114,8 @@ class MotoController extends Controller
                 'moto_unique_id' => $uniqueId,
                 'statut' => 'en attente'
             ]);
+
+        });
 
             return response()->json($moto, 201);
         } catch (Exception $e) {
@@ -119,17 +128,18 @@ class MotoController extends Controller
     public function update(Request $request, $id)
     {
         try {
-            $moto = Moto::findOrFail($id);
+            $moto = MotosValide::findOrFail($id);
 
             $validatedData = $request->validate([
+                'vin' => 'required',
                 'model' => 'required',
                 'gps_imei' => 'required',
             ]);
 
             $moto->update([
+                'vin' => $validatedData['vin'],
                 'model' => $validatedData['model'],
                 'gps_imei' => $validatedData['gps_imei'],
-                'statut' => 'en attente'
             ]);
 
             return response()->json($moto);
@@ -190,7 +200,7 @@ class MotoController extends Controller
     public function destroy($id)
     {
         try {
-            $moto = Moto::findOrFail($id);
+            $moto = MotosValide::findOrFail($id);
             $moto->delete();
 
             return response()->json(['message' => 'Moto supprimée']);

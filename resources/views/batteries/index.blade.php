@@ -440,13 +440,13 @@ document.addEventListener('DOMContentLoaded', function() {
                 </td>
                 <td>${createdAt}</td>
                 <td style="display: flex; gap: 5px;">
-                    <button class="action-btn edit-batterie" title="Modifier" ${batterie.statut === 'validé' ? 'disabled' : ''}>
+                    <button class="action-btn edit-batterie" title="Modifier" >
                         <i class="fas fa-edit"></i>
                     </button>
-                    <button class="action-btn validate-batterie" title="Valider" ${batterie.statut !== 'en attente' ? 'disabled' : ''}>
+                    <button class="action-btn validate-batterie" title="Valider" >
                         <i class="fas fa-check"></i>
                     </button>
-                    <button class="action-btn delete-batterie" title="Supprimer" ${batterie.statut === 'validé' ? 'disabled' : ''}>
+                    <button class="action-btn delete-batterie" title="Supprimer" >
                         <i class="fas fa-trash"></i>
                     </button>
                      <button class="action-btn bms" title="Données BMS">

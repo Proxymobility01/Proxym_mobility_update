@@ -15,7 +15,7 @@
 /* Styles pour les cartes de statistiques */
 .stats-grid {
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(4, 1fr);
     gap: 15px;
     margin-bottom: 20px;
 }
@@ -51,6 +51,10 @@
 
 .danger .stat-icon {
     color: #dc3545;
+}
+
+.amount .stat-icon {
+    color: #007bff;
 }
 
 .stat-details {
@@ -115,7 +119,7 @@
     margin-bottom: 10px;
 }
 
-.date-picker-container {
+.date-picker-container, .date-range-container {
     display: none;
     margin-left: 10px;
     margin-bottom: 10px;
@@ -261,7 +265,7 @@ tr:hover {
                 <i class="fas fa-users"></i>
             </div>
             <div class="stat-details">
-                <div class="stat-number" id="total-drivers">0</div>
+                <div class="stat-number" id="total-drivers">{{ $totalDrivers }}</div>
                 <div class="stat-label">Chauffeurs Associés</div>
                 <div class="stat-text">Total des chauffeurs</div>
             </div>
@@ -272,7 +276,7 @@ tr:hover {
                 <i class="fas fa-check-circle"></i>
             </div>
             <div class="stat-details">
-                <div class="stat-number" id="paid-leases">0</div>
+                <div class="stat-number" id="paid-leases">{{ $paidLeasesCount }}</div>
                 <div class="stat-label">Leases Payés</div>
                 <div class="stat-text" id="paid-time-label">aujourd'hui</div>
             </div>
@@ -283,9 +287,20 @@ tr:hover {
                 <i class="fas fa-times-circle"></i>
             </div>
             <div class="stat-details">
-                <div class="stat-number" id="unpaid-leases">0</div>
+                <div class="stat-number" id="unpaid-leases">{{ $unpaidLeasesCount }}</div>
                 <div class="stat-label">Leases Impayés</div>
                 <div class="stat-text" id="unpaid-time-label">aujourd'hui</div>
+            </div>
+        </div>
+
+        <div class="stat-card amount">
+            <div class="stat-icon">
+                <i class="fas fa-money-bill-wave"></i>
+            </div>
+            <div class="stat-details">
+                <div class="stat-number" id="total-amount">{{ number_format($totalAmount, 2) }} FCFA</div>
+                <div class="stat-label">Montant Total</div>
+                <div class="stat-text" id="amount-time-label">aujourd'hui</div>
             </div>
         </div>
     </div>
@@ -306,17 +321,37 @@ tr:hover {
                 <option value="unpaid">Impayés</option>
             </select>
             
+            <select id="agence-filter">
+                <option value="all">Toutes les stations</option>
+                @foreach($agences as $agence)
+                <option value="{{ $agence->id }}">{{ $agence->nom_agence }}</option>
+                @endforeach
+            </select>
+            
+            <select id="swappeur-filter">
+                <option value="all">Tous les swappeurs</option>
+                @foreach($swappeurs as $swappeur)
+                <option value="{{ $swappeur->id }}">{{ $swappeur->nom }} {{ $swappeur->prenom }}</option>
+                @endforeach
+            </select>
+            
             <select id="time-filter">
                 <option value="today">Aujourd'hui</option>
                 <option value="week">Cette semaine</option>
                 <option value="month">Ce mois</option>
                 <option value="year">Cette année</option>
                 <option value="custom">Date spécifique</option>
+                <option value="daterange">Plage de dates</option>
                 <option value="all">Tout l'historique</option>
             </select>
             
             <div id="date-picker-container" class="date-picker-container">
                 <input type="date" id="custom-date" class="custom-date">
+            </div>
+            
+            <div id="date-range-container" class="date-range-container">
+                <input type="date" id="start-date" class="start-date" placeholder="Date début">
+                <input type="date" id="end-date" class="end-date" placeholder="Date fin">
             </div>
         </div>
     </div>
@@ -336,26 +371,37 @@ document.addEventListener('DOMContentLoaded', function() {
     const searchInput = document.getElementById('search-lease');
     const statusFilter = document.getElementById('status-filter');
     const timeFilter = document.getElementById('time-filter');
+    const agenceFilter = document.getElementById('agence-filter');
+    const swappeurFilter = document.getElementById('swappeur-filter');
     const customDatePicker = document.getElementById('custom-date');
     const datePickerContainer = document.getElementById('date-picker-container');
+    const startDatePicker = document.getElementById('start-date');
+    const endDatePicker = document.getElementById('end-date');
+    const dateRangeContainer = document.getElementById('date-range-container');
     const leasesContent = document.getElementById('leases-content');
     const paidTimeLabel = document.getElementById('paid-time-label');
     const unpaidTimeLabel = document.getElementById('unpaid-time-label');
+    const amountTimeLabel = document.getElementById('amount-time-label');
     
     // Afficher la date actuelle dans l'en-tête
     const dateElement = document.getElementById('date');
     const today = new Date();
     dateElement.textContent = today.toLocaleDateString('fr-FR');
     
-    // Initialiser la date du sélecteur à la date du jour
+    // Initialiser les dates des sélecteurs
     customDatePicker.valueAsDate = today;
+    startDatePicker.valueAsDate = new Date(today.getFullYear(), today.getMonth(), 1);
+    endDatePicker.valueAsDate = today;
 
-    // Gérer l'affichage du sélecteur de date
+    // Gérer l'affichage des sélecteurs de date
     timeFilter.addEventListener('change', function() {
+        datePickerContainer.style.display = 'none';
+        dateRangeContainer.style.display = 'none';
+        
         if (this.value === 'custom') {
             datePickerContainer.style.display = 'block';
-        } else {
-            datePickerContainer.style.display = 'none';
+        } else if (this.value === 'daterange') {
+            dateRangeContainer.style.display = 'block';
         }
     });
 
@@ -363,12 +409,17 @@ document.addEventListener('DOMContentLoaded', function() {
     function calculateStats() {
         // Préparer les données
         const data = {
-            timeFilter: timeFilter.value
+            timeFilter: timeFilter.value,
+            agence: agenceFilter.value,
+            swappeur: swappeurFilter.value
         };
         
-        // Ajouter la date personnalisée si nécessaire
+        // Ajouter les dates en fonction du filtre
         if (timeFilter.value === 'custom') {
             data.customDate = customDatePicker.value;
+        } else if (timeFilter.value === 'daterange') {
+            data.startDate = startDatePicker.value;
+            data.endDate = endDatePicker.value;
         }
         
         // Récupérer les données
@@ -386,10 +437,12 @@ document.addEventListener('DOMContentLoaded', function() {
             document.getElementById('total-drivers').textContent = data.totalDrivers;
             document.getElementById('paid-leases').textContent = data.paidLeases;
             document.getElementById('unpaid-leases').textContent = data.unpaidLeases;
+            document.getElementById('total-amount').textContent = data.totalAmount + ' FCFA';
             
             // Mettre à jour les libellés de période
             paidTimeLabel.textContent = data.timeLabel;
             unpaidTimeLabel.textContent = data.timeLabel;
+            amountTimeLabel.textContent = data.timeLabel;
         })
         .catch(error => {
             console.error('Erreur lors du chargement des statistiques:', error);
@@ -402,17 +455,24 @@ document.addEventListener('DOMContentLoaded', function() {
         const searchTerm = searchInput.value.toLowerCase();
         const statusValue = statusFilter.value;
         const timeValue = timeFilter.value;
+        const agenceValue = agenceFilter.value;
+        const swappeurValue = swappeurFilter.value;
         
         // Préparer les données
         const data = {
             search: searchTerm,
             status: statusValue,
-            time: timeValue
+            time: timeValue,
+            agence: agenceValue,
+            swappeur: swappeurValue
         };
         
-        // Ajouter la date personnalisée si nécessaire
+        // Ajouter les dates en fonction du filtre
         if (timeValue === 'custom') {
             data.customDate = customDatePicker.value;
+        } else if (timeValue === 'daterange') {
+            data.startDate = startDatePicker.value;
+            data.endDate = endDatePicker.value;
         }
         
         // Afficher un indicateur de chargement
@@ -511,6 +571,7 @@ document.addEventListener('DOMContentLoaded', function() {
             if (data.timeLabel) {
                 paidTimeLabel.textContent = data.timeLabel;
                 unpaidTimeLabel.textContent = data.timeLabel;
+                amountTimeLabel.textContent = data.timeLabel;
             }
             
             // Si aucun contenu n'a été ajouté
@@ -559,18 +620,43 @@ document.addEventListener('DOMContentLoaded', function() {
     searchInput.addEventListener('input', debounce(filterLeases, 500));
     statusFilter.addEventListener('change', filterLeases);
     timeFilter.addEventListener('change', function() {
+        if (datePickerContainer) datePickerContainer.style.display = 'none';
+        if (dateRangeContainer) dateRangeContainer.style.display = 'none';
+        
         if (this.value === 'custom') {
             datePickerContainer.style.display = 'block';
-        } else {
-            datePickerContainer.style.display = 'none';
+        } else if (this.value === 'daterange') {
+            dateRangeContainer.style.display = 'block';
         }
         filterLeases();
         calculateStats();
     });
+    agenceFilter.addEventListener('change', function() {
+        filterLeases();
+        calculateStats();
+    });
+    swappeurFilter.addEventListener('change', function() {
+        filterLeases();
+        calculateStats();
+    });
     
-    // Événement pour le changement de date personnalisée
+    // Événements pour les changements de date
     customDatePicker.addEventListener('change', function() {
         if (timeFilter.value === 'custom') {
+            filterLeases();
+            calculateStats();
+        }
+    });
+    
+    startDatePicker.addEventListener('change', function() {
+        if (timeFilter.value === 'daterange') {
+            filterLeases();
+            calculateStats();
+        }
+    });
+    
+    endDatePicker.addEventListener('change', function() {
+        if (timeFilter.value === 'daterange') {
             filterLeases();
             calculateStats();
         }

@@ -23,7 +23,7 @@ class DailyDistance extends Model
     public $timestamps = true;
 
     /**
-     * Relation avec l'utilisateur validé.
+     * Relation avec l'utilisateur validé.ùoto
      */
     public function user()
     {

@@ -16,7 +16,7 @@ class BatteriesValide extends Model
         'mac_id',
         'date_production',
         'fabriquant',
-        'distances',
+        'gps',
         'statut',
     ];
 

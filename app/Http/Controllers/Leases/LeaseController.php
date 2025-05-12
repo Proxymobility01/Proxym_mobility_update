@@ -8,7 +8,9 @@ use App\Models\PaiementLease;
 use App\Models\UsersAgence;
 use App\Models\AssociationUserMoto;
 use App\Models\MotosValide;
+use App\Models\Agence;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Carbon\Carbon;
 
 class LeaseController extends Controller
@@ -22,9 +24,13 @@ class LeaseController extends Controller
             ->whereNull('deleted_at')
             ->get();
             
+        // Récupérer toutes les agences et tous les swappeurs pour les filtres
+        $agences = Agence::all();
+        $swappeurs = UsersAgence::all();
+        
         // Récupérer les leases payés aujourd'hui par défaut
         $paidLeases = PaiementLease::with([
-            'moto.users', // Charger la relation entre moto et utilisateur
+            'moto.users',
             'userAgence.agence'
         ])
         ->whereDate('created_at', Carbon::today())
@@ -33,7 +39,27 @@ class LeaseController extends Controller
         // Préparer les données pour la vue
         $leases = $this->prepareLeaseData($associations, $paidLeases, 'today');
         
-        return view('lease.index', compact('leases', 'pageTitle'));
+        // Calculer les statistiques initiales
+        $totalDrivers = $associations->count();
+        
+        // Compter les leases payés pour aujourd'hui
+        $paidMotoIds = $paidLeases->pluck('id_moto')->unique()->toArray();
+        $paidLeasesCount = count($paidMotoIds);
+        $unpaidLeasesCount = $totalDrivers - $paidLeasesCount;
+        
+        // Calculer le montant total des leases
+        $totalAmount = $paidLeases->sum('total_lease');
+        
+        return view('lease.index', compact(
+            'leases', 
+            'pageTitle', 
+            'agences', 
+            'swappeurs', 
+            'totalDrivers', 
+            'paidLeasesCount', 
+            'unpaidLeasesCount',
+            'totalAmount'
+        ));
     }
     
     /**
@@ -109,12 +135,20 @@ class LeaseController extends Controller
         $status = $request->input('status', 'all');
         $time = $request->input('time', 'today');
         $customDate = $request->input('customDate', null);
+        $startDate = $request->input('startDate', null);
+        $endDate = $request->input('endDate', null);
+        $agence = $request->input('agence', 'all');
+        $swappeur = $request->input('swappeur', 'all');
     
         // Déterminer les dates de début et de fin pour le filtre
         if ($time === 'custom' && $customDate) {
             $startDate = Carbon::parse($customDate)->startOfDay();
             $endDate = Carbon::parse($customDate)->endOfDay();
             $timeLabel = 'le ' . Carbon::parse($customDate)->format('d/m/Y');
+        } elseif ($time === 'daterange' && $startDate && $endDate) {
+            $startDate = Carbon::parse($startDate)->startOfDay();
+            $endDate = Carbon::parse($endDate)->endOfDay();
+            $timeLabel = 'du ' . Carbon::parse($startDate)->format('d/m/Y') . ' au ' . Carbon::parse($endDate)->format('d/m/Y');
         } else {
             $startDate = null;
             $endDate = Carbon::now();
@@ -149,9 +183,23 @@ class LeaseController extends Controller
     
         if ($startDate) {
             for ($date = $startDate->copy(); $date->lte($endDate); $date->addDay()) {
-                $paidLeases = PaiementLease::with(['moto.users', 'userAgence.agence'])
-                    ->whereDate('created_at', $date->format('Y-m-d'))
-                    ->get();
+                // Construire la requête pour les paiements
+                $query = PaiementLease::with(['moto.users', 'userAgence.agence'])
+                    ->whereDate('created_at', $date->format('Y-m-d'));
+                
+                // Filtrer par agence
+                if ($agence !== 'all') {
+                    $query->whereHas('userAgence.agence', function ($q) use ($agence) {
+                        $q->where('id', $agence);
+                    });
+                }
+                
+                // Filtrer par swappeur
+                if ($swappeur !== 'all') {
+                    $query->where('id_user_agence', $swappeur);
+                }
+                
+                $paidLeases = $query->get();
     
                 $leases = $this->prepareLeaseData($associations, $paidLeases, 'custom', $date);
     
@@ -230,90 +278,87 @@ class LeaseController extends Controller
     {
         $timeFilter = $request->input('timeFilter', 'today');
         $customDate = $request->input('customDate', null);
+        $startDate = $request->input('startDate', null);
+        $endDate = $request->input('endDate', null);
+        $agence = $request->input('agence', 'all');
+        $swappeur = $request->input('swappeur', 'all');
     
         // Initialiser les variables
-        $startDate = null;
-        $endDate = Carbon::now();
+        $filterStartDate = null;
+        $filterEndDate = Carbon::now();
         $timeLabel = 'historique complet';
     
         // Récupérer tous les chauffeurs associés
         $associations = AssociationUserMoto::whereNull('deleted_at')->get();
         $totalDrivers = $associations->count();
     
-        $paidCount = 0;
-        $unpaidCount = 0;
-    
-        // Si custom date, gérer comme un jour unique sans boucle
+        // Déterminer la période
         if ($timeFilter === 'custom' && $customDate) {
-            $date = Carbon::parse($customDate)->format('Y-m-d');
+            $filterStartDate = Carbon::parse($customDate)->startOfDay();
+            $filterEndDate = Carbon::parse($customDate)->endOfDay();
             $timeLabel = 'le ' . Carbon::parse($customDate)->format('d/m/Y');
-    
-            // Paiements effectués ce jour-là
-            $paidMotoIds = PaiementLease::whereDate('created_at', $date)
-                ->pluck('id_moto')
-                ->toArray();
-    
-            // Comparer pour chaque association
-            foreach ($associations as $association) {
-                $motoId = $association->moto_valide_id;
-                if (in_array($motoId, $paidMotoIds)) {
-                    $paidCount++;
-                } else {
-                    $unpaidCount++;
-                }
-            }
+        } elseif ($timeFilter === 'daterange' && $startDate && $endDate) {
+            $filterStartDate = Carbon::parse($startDate)->startOfDay();
+            $filterEndDate = Carbon::parse($endDate)->endOfDay();
+            $timeLabel = 'du ' . Carbon::parse($startDate)->format('d/m/Y') . ' au ' . Carbon::parse($endDate)->format('d/m/Y');
         } else {
-            // Autres périodes : semaine, mois, année
             switch ($timeFilter) {
                 case 'today':
-                    $startDate = Carbon::today();
+                    $filterStartDate = Carbon::today();
                     $timeLabel = 'aujourd\'hui';
                     break;
                 case 'week':
-                    $startDate = Carbon::now()->startOfWeek();
+                    $filterStartDate = Carbon::now()->startOfWeek();
                     $timeLabel = 'cette semaine';
                     break;
                 case 'month':
-                    $startDate = Carbon::now()->startOfMonth();
+                    $filterStartDate = Carbon::now()->startOfMonth();
                     $timeLabel = 'ce mois';
                     break;
                 case 'year':
-                    $startDate = Carbon::now()->startOfYear();
+                    $filterStartDate = Carbon::now()->startOfYear();
                     $timeLabel = 'cette année';
                     break;
             }
-    
-            $endDate = Carbon::now();
-            
-            if ($startDate) {
-                for ($date = $startDate->copy(); $date->lte($endDate); $date->addDay()) {
-                    $paidLeases = PaiementLease::whereDate('created_at', $date->format('Y-m-d'))
-                        ->pluck('id_moto')
-                        ->toArray();
-    
-                    foreach ($associations as $association) {
-                        $motoId = $association->moto_valide_id;
-                        if (in_array($motoId, $paidLeases)) {
-                            $paidCount++;
-                        } else {
-                            $unpaidCount++;
-                        }
-                    }
-                }
-            } else {
-                // Historique complet (aucune période filtrée)
-                $paidMotoIds = PaiementLease::pluck('id_moto')->unique()->toArray();
-                $paidCount = count($paidMotoIds);
-                $unpaidCount = $totalDrivers - $paidCount;
-            }
         }
+    
+        // Requête de base pour les leases
+        $query = PaiementLease::query();
+    
+        // Filtrer par période
+        if ($filterStartDate && $filterEndDate) {
+            $query->whereBetween('created_at', [$filterStartDate, $filterEndDate]);
+        }
+    
+        // Filtrer par agence si spécifié
+        if ($agence !== 'all') {
+            $query->whereHas('userAgence.agence', function ($q) use ($agence) {
+                $q->where('id', $agence);
+            });
+        }
+    
+        // Filtrer par swappeur si spécifié
+        if ($swappeur !== 'all') {
+            $query->where('id_user_agence', $swappeur);
+        }
+    
+        // Récupérer les leases payés pendant la période
+        $paidLeases = $query->get();
+        
+        // Calculer les statistiques
+        $paidMotoIds = $paidLeases->pluck('id_moto')->unique();
+        $paidCount = $paidMotoIds->count();
+        $unpaidCount = $totalDrivers - $paidCount;
+        
+        // Calculer le montant total en additionnant les montants réels
+        $totalAmount = $paidLeases->sum('total_lease');
     
         return response()->json([
             'totalDrivers' => $totalDrivers,
             'paidLeases' => $paidCount,
             'unpaidLeases' => $unpaidCount,
+            'totalAmount' => number_format($totalAmount, 2),
             'timeLabel' => $timeLabel
         ]);
     }
-    
 }

@@ -281,6 +281,10 @@
                 @method('PUT')
                 <input type="hidden" id="edit-moto-id" name="id">
                 <div class="form-group">
+                    <label for="vin">VIN</label>
+                    <input type="text" id="edit-vin" name="vin" required>
+                </div>
+                <div class="form-group">
                     <label for="edit-model">Modèle</label>
                     <input type="text" id="edit-model" name="model" required>
                 </div>
@@ -522,10 +526,12 @@ document.addEventListener('DOMContentLoaded', function() {
      */
     function openEditMotoModal(row) {
         const id = row.dataset.id;
+        const vin = row.querySelector('td:nth-child(2)').textContent;
         const model = row.querySelector('td:nth-child(3)').textContent;
         const gpsImei = row.querySelector('td:nth-child(4)').textContent;
         
         document.getElementById('edit-moto-id').value = id;
+        document.getElementById('edit-vin').value = vin;
         document.getElementById('edit-model').value = model;
         document.getElementById('edit-gps_imei').value = gpsImei;
         

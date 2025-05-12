@@ -136,7 +136,7 @@ class BatterieController extends Controller
     {
         try {
             $validatedData = $request->validate([
-                'mac_id' => 'required|unique:batteries,mac_id',
+                'mac_id' => 'required|unique:batteries_valides,mac_id',
                 'fabriquant' => 'required',
                 'gps' => 'required',
                 'date_production' => 'nullable|date',
@@ -144,7 +144,7 @@ class BatterieController extends Controller
 
             // Génération de l'ID unique
             $today = Carbon::now()->format('Ymd');
-            $lastBatterie = Batterie::where('batterie_unique_id', 'like', 'PXB' . $today . '%')
+            $lastBatterie = BatteriesValide::where('batterie_unique_id', 'like', 'PXB' . $today . '%')
                 ->orderBy('batterie_unique_id', 'desc')
                 ->first();
             $counter = $lastBatterie ? (int)substr($lastBatterie->batterie_unique_id, -3) + 1 : 1;
@@ -169,7 +169,7 @@ class BatterieController extends Controller
     public function update(Request $request, $id)
     {
         try {
-            $batterie = Batterie::findOrFail($id);
+            $batterie = BatteriesValide::findOrFail($id);
             $validatedData = $request->validate([
                 'fabriquant' => 'required',
                 'gps' => 'required',

@@ -19,65 +19,36 @@ class LocalisationController extends Controller
     const ZONE_STATUS_CACHE_KEY = 'moto_zone_status';
     
     public function carteDouala()
-    {
+    {   
         return view('gps.douala_map');
     }
 
     public function apiZoneDouala()
     {
-        // Suppression de tout caractère BOM qui pourrait causer des problèmes JSON
         ob_clean();
-        
-        // Créer une réponse JSON propre
-        return response()
-            ->json($this->doualaCoordinates(), 200, [
-                'Content-Type' => 'application/json; charset=utf-8',
-                'Cache-Control' => 'no-store, no-cache, must-revalidate, max-age=0',
-                'Pragma' => 'no-cache',
-                'Expires' => 'Sat, 01 Jan 1990 00:00:00 GMT'
-            ]);
+        return response()->json($this->doualaCoordinates(), 200, [
+            'Content-Type' => 'application/json; charset=utf-8',
+            'Cache-Control' => 'no-store, no-cache, must-revalidate, max-age=0',
+            'Pragma' => 'no-cache',
+            'Expires' => 'Sat, 01 Jan 1990 00:00:00 GMT'
+        ]);
     }
 
     public function apiMotosPositions()
     {
-        $motos = MotosValide::with('users')->get();
+        $positions = Cache::get('motos_latest_positions', []);
         $zone = $this->doualaCoordinates();
         $zoneStatusCache = $this->getZoneStatusCache();
-        
-        // Debug du cache
-        Log::debug("État du cache des zones au début: " . json_encode($zoneStatusCache));
-        
         $resultats = [];
 
-        foreach ($motos as $moto) {
-            // Récupérer la dernière position GPS connue
-            $lastLocation = GpsLocation::where('macid', $moto->gps_imei)
-                ->orderBy('server_time', 'desc')
-                ->first();
+        foreach ($positions as $macid => $data) {
+            $moto = MotosValide::where('gps_imei', $macid)->first();
+            if (!$moto) continue;
 
-            if (!$lastLocation) continue;
+            $point = ['lat' => (float)$data['latitude'], 'lng' => (float)$data['longitude']];
+            $inZone = $data['inZone'] ?? $this->pointInPolygon($point, $zone);
+            $heading = $data['heading'] ?? 0;
 
-            // Récupérer l'avant-dernière position pour calculer la direction
-            $previousLocation = GpsLocation::where('macid', $moto->gps_imei)
-                ->where('id', '<>', $lastLocation->id)
-                ->orderBy('server_time', 'desc')
-                ->first();
-
-            $point = ['lat' => (float)$lastLocation->latitude, 'lng' => (float)$lastLocation->longitude];
-            $inZone = $this->pointInPolygon($point, $zone);
-
-            // Calculer la direction (heading) si possible
-            $heading = 0;
-            if ($previousLocation) {
-                $heading = $this->calculateHeading(
-                    $previousLocation->latitude, 
-                    $previousLocation->longitude,
-                    $lastLocation->latitude, 
-                    $lastLocation->longitude
-                );
-            }
-
-            // Récupérer les informations du chauffeur associé
             $association = AssociationUserMoto::where('moto_valide_id', $moto->id)->latest()->first();
             $userInfo = "Non associé";
             $driverName = null;
@@ -86,26 +57,19 @@ class LocalisationController extends Controller
                 $user = $association->validatedUser;
                 $driverName = "{$user->nom} {$user->prenom}";
                 $userInfo = "{$driverName} - {$user->phone}";
-
-                Log::info("Moto VIN: {$moto->vin}, macid: {$moto->gps_imei}, coordonnées: [{$point['lat']}, {$point['lng']}], Chauffeur: {$userInfo}, InZone: " . ($inZone ? '✅ DANS la zone' : '❌ HORS zone'));
-            } else {
-                Log::warning("Moto VIN: {$moto->vin}, macid: {$moto->gps_imei}, coordonnées: [{$point['lat']}, {$point['lng']}], PAS ASSOCIÉE à un chauffeur.");
             }
 
-            // Gérer l'envoi des alertes en fonction des changements d'état
             $this->gererAlerteZone($moto, $point, $userInfo, $inZone, $zoneStatusCache);
 
-            // Déterminer le statut d'activité
             $isActive = true;
-            $lastUpdateTime = Carbon::parse($lastLocation->server_time);
+            $lastUpdateTime = Carbon::parse($data['server_time']);
             if ($lastUpdateTime->diffInHours(now()) > 24) {
                 $isActive = false;
             }
 
-            // Ajouter les informations à la liste des résultats
             $resultats[] = [
-                'vin' => $moto->vin,
-                'macid' => $moto->gps_imei,
+                'vin' => $data['vin'],
+                'macid' => $macid,
                 'driverInfo' => $userInfo,
                 'driverName' => $driverName,
                 'latitude' => $point['lat'],
@@ -113,28 +77,71 @@ class LocalisationController extends Controller
                 'inZone' => $inZone,
                 'heading' => $heading,
                 'isActive' => $isActive,
-                'lastUpdate' => $lastLocation->server_time,
-                'batteryLevel' => $lastLocation->battery_level ?? 100, // Si disponible dans votre modèle
+                'lastUpdate' => $data['server_time'],
+                'batteryLevel' => $data['battery_level'] ?? 100,
             ];
         }
 
-        // Sauvegarder l'état actualisé dans le cache
         $this->saveZoneStatusCache($zoneStatusCache);
-        
-        // Debug du cache après mise à jour
-        Log::debug("État du cache des zones après mise à jour: " . json_encode($zoneStatusCache));
 
-        // Suppression de tout caractère BOM qui pourrait causer des problèmes JSON
         ob_clean();
-        
-        // Créer une réponse JSON propre
-        return response()
-            ->json($resultats, 200, [
-                'Content-Type' => 'application/json; charset=utf-8',
-                'Cache-Control' => 'no-store, no-cache, must-revalidate, max-age=0',
-                'Pragma' => 'no-cache',
-                'Expires' => 'Sat, 01 Jan 1990 00:00:00 GMT'
-            ]);
+        return response()->json($resultats, 200, [
+            'Content-Type' => 'application/json; charset=utf-8',
+            'Cache-Control' => 'no-store, no-cache, must-revalidate, max-age=0',
+            'Pragma' => 'no-cache',
+            'Expires' => 'Sat, 01 Jan 1990 00:00:00 GMT'
+        ]);
+    }
+
+
+    public function updateCacheMotosEtZones()
+    {
+        \Log::info("✅ debut de la fonction update cache Moto et zone");
+        \Log::info('🕒 [CRON] update:moto-zones exécuté à ' . now());
+        $positions = [];
+        $zone = $this->doualaCoordinates();
+        $zoneStatusCache = $this->getZoneStatusCache();
+        $motos = MotosValide::all();
+
+        foreach ($motos as $moto) {
+            $last = GpsLocation::where('macid', $moto->gps_imei)->orderBy('server_time', 'desc')->first();
+            $prev = GpsLocation::where('macid', $moto->gps_imei)->where('id', '<>', optional($last)->id)->orderBy('server_time', 'desc')->first();
+
+            if (!$last) continue;
+
+            $point = ['lat' => (float) $last->latitude, 'lng' => (float) $last->longitude];
+            $inZone = $this->pointInPolygon($point, $zone);
+            $heading = 0;
+
+            if ($prev) {
+                $heading = $this->calculateHeading($prev->latitude, $prev->longitude, $last->latitude, $last->longitude);
+            }
+
+            $userInfo = "Non associé";
+            $association = AssociationUserMoto::where('moto_valide_id', $moto->id)->latest()->first();
+            if ($association && $association->validatedUser) {
+                $user = $association->validatedUser;
+                $userInfo = "{$user->nom} {$user->prenom} - {$user->phone}";
+            }
+
+            $this->gererAlerteZone($moto, $point, $userInfo, $inZone, $zoneStatusCache);
+
+            $positions[$moto->gps_imei] = [
+                'vin' => $moto->vin,
+                'macid' => $moto->gps_imei,
+                'latitude' => $point['lat'],
+                'longitude' => $point['lng'],
+                'server_time' => $last->server_time,
+                'battery_level' => $last->battery_level ?? null,
+                'heading' => $heading,
+                'inZone' => $inZone,
+            ];
+        }
+
+        Cache::put('motos_latest_positions', $positions, now()->addMinutes(30));
+        $this->saveZoneStatusCache($zoneStatusCache);
+
+        Log::info("✅ Cache des positions motos mis à jour avec alertes zone.");
     }
 
     /**
@@ -380,4 +387,10 @@ class LocalisationController extends Controller
         ];
         
     }
+
+
+
+
+
+    
 }
