@@ -1,5 +1,7 @@
 @extends('layouts.app')
 
+
+@section('content')
 <style>
 /* Couleurs d'application */
 :root {
@@ -483,7 +485,6 @@ tr:hover {
 }
 </style>
 
-@section('content')
 <div class="main-content">
     <!-- En-tête -->
     <div class="content-header">
@@ -623,9 +624,20 @@ tr:hover {
                     <button class="action-btn edit-association" title="Modifier l'association">
                         <i class="fas fa-edit"></i>
                     </button>
+                 
                     <button class="action-btn delete-association" title="Supprimer l'association">
                         <i class="fas fa-trash"></i>
                     </button>
+                   
+                     <form action="{{ route('associations.batterie.moto.user.desassociate', $association->id) }}" method="POST" onsubmit="return confirm('Confirmer la désassociation ?');">
+    @csrf
+    @method('PATCH')
+    <button type="submit" class="action-btn" title="Désassocier">
+        <i class="fas fa-unlink" style="color: #dcdb32;"></i>
+    </button>
+</form>
+
+
                 </td>
             </tr>
             @endforeach

@@ -193,7 +193,7 @@ class SwapController extends Controller
                     'battery_out_soc' => $swap->battery_out_soc . '%',
                     'battery_in' => $batteryIn->mac_id ?? 'Non défini',
                     'battery_in_soc' => $swap->battery_in_soc . '%',
-                    'swap_price' => number_format($swap->swap_price, 2) . ' FCFA',
+                    'swap_price' => number_format($swap->swap_price, 2),
                     'station' => $station->nom_agence ?? 'Non défini',
                     'swappeur_name' => ($swappeur->nom ?? '') . ' ' . ($swappeur->prenom ?? ''),
                     'swap_date' => Carbon::parse($swap->swap_date)->format('d/m/Y H:i')

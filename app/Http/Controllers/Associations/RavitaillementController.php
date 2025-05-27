@@ -9,6 +9,7 @@ use App\Models\BatteryEntrepot;
 use App\Models\BatteriesValide;
 use App\Models\BatteryAgence;
 use App\Models\HistoriqueEntrepot;
+use App\Models\BatteryMotoUserAssociation;
 use Carbon\Carbon;
 
 class RavitaillementController extends Controller
@@ -21,69 +22,83 @@ public function index()
     
     // Récupérer les batteries disponibles (ni dans un entrepôt, ni dans une agence)
     $batteries = BatteriesValide::whereDoesntHave('batteryEntrepots')
-                               ->whereDoesntHave('batteryAgences')
-                               ->get();
+                           ->whereDoesntHave('batteryAgences')
+                           ->whereDoesntHave('batteryMotoUserAssociations')
+                           ->get();
     
     // Récupérer l'historique des ravitaillements depuis la table HistoriqueEntrepot (avec pagination)
-    $ravitailles = HistoriqueEntrepot::with(['entrepot', 'batteryValide'])  // Relations possibles à adapter en fonction de la structure
-                                   ->orderBy('created_at', 'desc')
-                                   ->paginate(15);
+   // $ravitailles = HistoriqueEntrepot::with(['entrepot', 'batteryValide'])  // Relations possibles à adapter en fonction de la structure
+   //                                ->orderBy('created_at', 'desc')
+   //                                ->paginate(15);
+
+   $ravitailles = BatteryEntrepot::orderBy('created_at', 'desc')->paginate(15);
+
                                    
     // Statistiques
     $stats = [
         'total_batteries' => BatteriesValide::count(),
         'batteries_entrepot' => BatteryEntrepot::count(),
-        'batteries_disponibles' => BatteriesValide::whereDoesntHave('batteryEntrepots')
-                                                 ->whereDoesntHave('batteryAgences')
-                                                 ->count()
+        'batteries_disponibles' => BatteriesValide::whereDoesntHave('batteryEntrepots')->whereDoesntHave('batteryAgences')->whereDoesntHave('batteryMotoUserAssociations')->count()
     ];
     
     return view('association.ravitaillement', compact('entrepots', 'batteries', 'ravitailles', 'stats'));
 }
 
 
+// ravitaillement de batterie
+public function store(Request $request)
+{
+    // Validation des entrées
+    $request->validate([
+        'entrepot_id' => 'required|exists:entrepots,id',
+        'batteries' => 'required|array|min:1',
+        'batteries.*' => 'exists:batteries_valides,id',
+    ]);
 
-    // Ravitailler les batteries
-    public function store(Request $request)
-    {
-        // Validation des entrées
-        $request->validate([
-            'entrepot_id' => 'required|exists:entrepots,id',
-            'batteries' => 'required|array|min:1',
-            'batteries.*' => 'exists:batteries_valides,id',
-        ]);
-        
-        $count = 0;
-        
-        // Associer chaque batterie sélectionnée à l'entrepôt
-        foreach ($request->batteries as $battery_id) {
-            // Vérifier si la batterie n'est pas déjà associée à une agence
-            $existsInAgence = BatteryAgence::where('id_battery_valide', $battery_id)->exists();
-            
-            if (!$existsInAgence) {
-                // Créer l'association batterie-entrepôt
-                BatteryEntrepot::create([
-                    'id_battery_valide' => $battery_id,
-                    'id_entrepot' => $request->entrepot_id,
-                ]);
-                
-                // Enregistrer dans l'historique
-                HistoriqueEntrepot::create([
-                    'id_entrepot' => $request->entrepot_id,
-                    'id_distributeur' => auth()->id(), // Si vous avez un système d'authentification
-                    'bat_entrante' => $battery_id,
-                    'type_swap' => 'ravitaillement',
-                    'date_time' => Carbon::now(),
-                ]);
-                
-                $count++;
-            }
+    $count = 0;
+    $batteriesIgnorees = [];
+
+    foreach ($request->batteries as $battery_id) {
+        // Charger la batterie
+        $battery = BatteriesValide::find($battery_id);
+
+        $dejaEnAgence = $battery->batteryAgences()->exists();
+        $dejaEnEntrepot = $battery->batteryEntrepots()->exists();
+        $dejaChezChauffeur = $battery->batteryMotoUserAssociations()->exists();
+
+        if ($dejaEnAgence || $dejaEnEntrepot || $dejaChezChauffeur) {
+            $batteriesIgnorees[] = $battery->batterie_unique_id;
+            continue;
         }
-        
-        // Message de succès avec le nombre de batteries ravitaillées
-        return redirect()->route('ravitailler.batteries.index')
-                         ->with('success', "$count batteries ont été ravitaillées avec succès.");
+
+        // Si la batterie est libre, créer l'association avec l'entrepôt
+        BatteryEntrepot::create([
+            'id_battery_valide' => $battery_id,
+            'id_entrepot' => $request->entrepot_id,
+        ]);
+
+      //  HistoriqueEntrepot::create([
+    //        'id_entrepot' => $request->entrepot_id,
+    //        'id_distributeur' => auth()->id(),
+    //        'bat_entrante' => $battery_id,
+    //        'type_swap' => 'livraison',
+     //   ]);
+
+        $count++;
     }
+
+
+
+    // Préparer le message de retour
+    $message = "$count batteries ont été ravitaillées avec succès.";
+    if (!empty($batteriesIgnorees)) {
+        $message .= " Les batteries suivantes ont été ignorées car déjà utilisées : " . implode(', ', $batteriesIgnorees);
+        return redirect()->route('ravitailler.batteries.index')->with('success', $message)->with('warning_batteries', $batteriesIgnorees);
+    }
+
+    return redirect()->route('ravitailler.batteries.index')->with('success', $message);
+}
+
     
     // API pour les filtres
     public function filter(Request $request)

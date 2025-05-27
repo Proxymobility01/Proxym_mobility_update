@@ -155,19 +155,88 @@ tr:hover {
 }
 
 /* Modal */
+.modal {
+    display: none;
+    position: fixed;
+    z-index: 1000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    overflow: auto;
+    background-color: rgba(0,0,0,0.4);
+}
+
+.modal.active {
+    display: block;
+}
+
+.modal-content {
+    background-color: #fefefe;
+    margin: 5% auto;
+    padding: 0;
+    border: none;
+    border-radius: 8px;
+    width: 90%;
+    max-width: 600px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+}
+
 .modal-header {
     background-color: var(--tertiary);
     border-bottom: 1px solid #ddd;
+    padding: 15px 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-radius: 8px 8px 0 0;
 }
 
 .modal-title {
     color: var(--text);
     font-weight: bold;
+    margin: 0;
+}
+
+.close-modal {
+    color: #aaa;
+    font-size: 28px;
+    font-weight: bold;
+    cursor: pointer;
+}
+
+.close-modal:hover,
+.close-modal:focus {
+    color: black;
+    text-decoration: none;
+}
+
+.modal-body {
+    padding: 20px;
 }
 
 .modal-footer {
     background-color: var(--tertiary);
     border-top: 1px solid #ddd;
+    padding: 15px 20px;
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    border-radius: 0 0 8px 8px;
+}
+
+.form-label {
+    font-weight: bold;
+    margin-bottom: 5px;
+    display: block;
+}
+
+.form-select, .form-control {
+    width: 100%;
+    padding: 8px 12px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    margin-bottom: 15px;
 }
 
 .checkbox-container {
@@ -178,13 +247,27 @@ tr:hover {
     border-radius: 4px;
 }
 
+.form-check {
+    margin-bottom: 10px;
+}
+
+.form-check-input {
+    margin-right: 8px;
+}
+
+.form-check-label {
+    cursor: pointer;
+}
+
 /* Actions */
-.action-btn {
-    padding: 6px 12px;
+.btn {
+    padding: 8px 16px;
     border-radius: 4px;
     cursor: pointer;
     border: none;
     font-weight: bold;
+    text-decoration: none;
+    display: inline-block;
 }
 
 .btn-primary {
@@ -195,6 +278,10 @@ tr:hover {
 .btn-secondary {
     background-color: var(--tertiary);
     color: var(--secondary);
+}
+
+.btn:hover {
+    opacity: 0.9;
 }
 
 /* Toast */
@@ -252,25 +339,44 @@ tr:hover {
     font-style: italic;
 }
 
-
-
-
-/* Styles pour la modal de détails */
-.transaction-details {
-    display: flex;
-    flex-direction: column;
-    gap: 15px;
+/* Alert styles */
+.alert {
+    padding: 12px 15px;
+    margin: 15px 0;
+    border-radius: 4px;
+    border: 1px solid;
 }
 
-.transaction-detail-item {
-    display: flex;
-    justify-content: space-between;
-    padding-bottom: 10px;
-    border-bottom: 1px solid #eee;
+.alert-success {
+    background-color: #d4edda;
+    border-color: #c3e6cb;
+    color: #155724;
 }
 
-.transaction-detail-item:last-child {
-    border-bottom: none;
+.alert-warning {
+    background-color: #fff3cd;
+    border-color: #ffeaa7;
+    color: #856404;
+}
+
+.mb-3 {
+    margin-bottom: 1rem;
+}
+
+.ml-2 {
+    margin-left: 0.5rem;
+}
+
+.me-2 {
+    margin-right: 0.5rem;
+}
+
+.fw-bold {
+    font-weight: bold;
+}
+
+.text-muted {
+    color: #6c757d;
 }
 </style>
 
@@ -281,27 +387,44 @@ tr:hover {
         <div id="date" class="date"></div>
     </div>
 
-   <!-- Onglets de navigation -->
-<div class="nav-tabs">
-    <div class="nav-tab {{ Request::is('associations') || (Request::is('associations/*') && !Request::is('associations/batteries*')) ? 'active' : '' }}"
-         data-tab="moto-user"
-         data-url="{{ route('associations.index') }}">
-        Associations Moto-Utilisateur
+    <!-- Onglets de navigation -->
+    <div class="nav-tabs">
+        <div class="nav-tab {{ Request::is('associations') || (Request::is('associations/*') && !Request::is('associations/batteries*')) ? 'active' : '' }}"
+             data-tab="moto-user"
+             data-url="{{ route('associations.index') }}">
+            Associations Moto-Utilisateur
+        </div>
+
+        <div class="nav-tab {{ Request::is('associations/batteries*') ? 'active' : '' }}"
+             data-tab="battery-user"
+             data-url="{{ route('associations.batteries.index') }}">
+            Associations Batterie-Utilisateur
+        </div>
+
+        <div class="nav-tab {{ Request::is('ravitaillements') || Request::is('ravitaillements/*') ? 'active' : '' }}"
+             data-tab="ravitaillement"
+             data-url="{{ route('ravitailler.batteries.index') }}">
+            Ravitailler Une Station
+        </div>
     </div>
 
-    <div class="nav-tab {{ Request::is('associations/batteries*') ? 'active' : '' }}"
-         data-tab="battery-user"
-         data-url="{{ route('associations.batteries.index') }}">
-        Associations Batterie-Utilisateur
-    </div>
+    <!-- Messages de session -->
+    @if(session('success'))
+        <div class="alert alert-success">
+            {{ session('success') }}
+        </div>
+    @endif
 
-    <div class="nav-tab {{ Request::is('ravitaillements') || Request::is('ravitaillements/*') ? 'active' : '' }}"
-         data-tab="ravitaillement"
-         data-url="{{ route('ravitailler.batteries.index') }}">
-        Ravitailler Une Station
-    </div>
-</div>
-
+    @if(session('warning_batteries'))
+        <div class="alert alert-warning">
+            Les batteries suivantes ont été ignorées :
+            <ul>
+                @foreach(session('warning_batteries') as $bat)
+                    <li>{{ $bat }}</li>
+                @endforeach
+            </ul>
+        </div>
+    @endif
 
     <!-- Cartes des statistiques -->
     <div class="stats-grid">
@@ -310,9 +433,9 @@ tr:hover {
                 <i class="fas fa-warehouse"></i>
             </div>
             <div class="stat-details">
-                <div class="stat-number" id="total-entrepots">0</div>
-                <div class="stat-label">Entrepôts</div>
-                <div class="stat-text">Total des entrepôts</div>
+                <div class="stat-number" id="total-entrepots">{{ $stats['total_batteries'] ?? 0 }}</div>
+                <div class="stat-label">Total Batteries</div>
+                <div class="stat-text">dans le système</div>
             </div>
         </div>
 
@@ -321,9 +444,9 @@ tr:hover {
                 <i class="fas fa-battery-full"></i>
             </div>
             <div class="stat-details">
-                <div class="stat-number" id="total-ravitaillements">0</div>
-                <div class="stat-label">Batteries Ravitaillées</div>
-                <div class="stat-text" id="ravitaillement-time-label">aujourd'hui</div>
+                <div class="stat-number" id="batteries-entrepot">{{ $stats['batteries_entrepot'] ?? 0 }}</div>
+                <div class="stat-label">Batteries en Entrepôt</div>
+                <div class="stat-text">stockées</div>
             </div>
         </div>
 
@@ -332,7 +455,7 @@ tr:hover {
                 <i class="fas fa-battery-empty"></i>
             </div>
             <div class="stat-details">
-                <div class="stat-number" id="batteries-disponibles">0</div>
+                <div class="stat-number" id="batteries-disponibles">{{ $stats['batteries_disponibles'] ?? 0 }}</div>
                 <div class="stat-label">Batteries Disponibles</div>
                 <div class="stat-text">non assignées</div>
             </div>
@@ -343,7 +466,7 @@ tr:hover {
     <div class="search-bar">
         <div class="search-group">
             <input type="text" id="search-battery" placeholder="Rechercher une batterie par ID ou VIN...">
-            <button type="submit" class="search-btn">
+            <button type="button" class="search-btn" id="search-btn">
                 <i class="fas fa-search"></i>
             </button>
         </div>
@@ -377,119 +500,155 @@ tr:hover {
 
     <!-- Zone de contenu des ravitaillements -->
     <div id="ravitaillements-content">
-        <!-- Les ravitaillements seront chargés ici dynamiquement -->
-        <div class="loader-container">
-            <div class="loader"></div>
-        </div>
-    </div>
-
-
-
-    
-<!-- Modal de Ravitaillement -->
-<div class="modal fade" id="ravitaillementModal" tabindex="-1" aria-labelledby="ravitaillementModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-lg">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="ravitaillementModalLabel">Nouveau Ravitaillement</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        <!-- L'historique initial sera affiché ici -->
+        @if($ravitailles->count() > 0)
+            @php
+                $groupedRavitailles = $ravitailles->groupBy(function($item) {
+                    return $item->created_at->format('Y-m-d');
+                });
+            @endphp
+            
+            @foreach($groupedRavitailles as $date => $dailyRavitailles)
+                <div class="date-header">
+                    {{ \Carbon\Carbon::parse($date)->format('d/m/Y') }}
+                </div>
+                
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Entrepôt</th>
+                                <th>ID Batterie</th>
+                                <th>Distributeur</th>
+                                <th>Date d'Ajout</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach($dailyRavitailles as $ravitaille)
+                                <tr data-id="{{ $ravitaille->id }}">
+                                    <td>{{ $ravitaille->entrepot->nom_entrepot ?? 'N/A' }}</td>
+                                    <td>{{ $ravitaille->batteryValide->batterie_unique_id ?? $ravitaille->bat_entrante }}</td>
+                                    <td>{{ $ravitaille->distributeur->name ?? 'N/A' }}</td>
+                                    <td>{{ $ravitaille->created_at->format('d/m/Y H:i') }}</td>
+                                    <td>
+                                        <button class="btn btn-secondary btn-sm view-details" 
+                                                data-id="{{ $ravitaille->id }}"
+                                                data-entrepot="{{ $ravitaille->entrepot->nom_entrepot ?? 'N/A' }}"
+                                                data-battery="{{ $ravitaille->batteryValide->batterie_unique_id ?? $ravitaille->bat_entrante }}"
+                                                data-date="{{ $ravitaille->created_at->format('d/m/Y H:i') }}">
+                                            Détails
+                                        </button>
+                                    </td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+            @endforeach
+            
+            <!-- Pagination -->
+            <div class="pagination-container">
+                {{ $ravitailles->links() }}
             </div>
-            <form action="{{ route('ravitailler.batteries.store') }}" method="POST">
-                @csrf
-                <div class="modal-body">
-                    <div class="mb-3">
-                        <label for="entrepot" class="form-label fw-bold">Choisir un entrepôt</label>
-                        <select name="entrepot_id" id="entrepot" class="form-select" required>
-                            <option value="">Sélectionner un entrepôt</option>
-                            @foreach($entrepots as $entrepot)
-                                <option value="{{ $entrepot->id }}">{{ $entrepot->nom_entrepot }}</option>
-                            @endforeach
-                        </select>
-                    </div>
-                    
-                    <div class="mb-3">
-                        <label class="form-label fw-bold">Rechercher une batterie</label>
-                        <input type="text" class="form-control" id="modalBatterySearch" placeholder="Rechercher par ID ou VIN">
-                    </div>
-                    
-                    <div class="mb-3">
-                        <label class="form-label fw-bold">Batteries disponibles</label>
-                        <div class="checkbox-container" id="modalBatteriesList">
-                            @foreach($batteries as $battery)
-                                <div class="form-check mb-2 battery-item">
-                                    <input type="checkbox" class="form-check-input" name="batteries[]" value="{{ $battery->id }}" id="battery-{{ $battery->id }}">
-                                    <label class="form-check-label" for="battery-{{ $battery->id }}">
-                                        <span class="fw-bold">{{ $battery->batterie_unique_id }}</span>
-                                        <br>
-                                        <small class="text-muted">VIN: {{ $battery->mac_id }}</small>
-                                    </label>
-                                </div>
-                            @endforeach
-                        </div>
-                    </div>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annuler</button>
-                    <button type="submit" class="btn btn-primary">Ravitailler</button>
-                </div>
-            </form>
-        </div>
+        @else
+            <div class="no-results">Aucun ravitaillement trouvé.</div>
+        @endif
     </div>
 </div>
-<!-- Ajouter ce code à la fin du body dans votre vue ravitaillement.blade.php -->
 
-<!-- Modal de détails de transaction -->
-<div class="modal fade" id="transactionDetailsModal" tabindex="-1" aria-labelledby="transactionDetailsModalLabel" aria-hidden="true">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="transactionDetailsModalLabel">Détails de la Transaction</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
+<!-- Modal de Ravitaillement -->
+<div id="ravitaillementModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h5 class="modal-title">Nouveau Ravitaillement</h5>
+            <span class="close-modal">&times;</span>
+        </div>
+        <form action="{{ route('ravitailler.batteries.store') }}" method="POST" id="ravitaillementForm">
+            @csrf
             <div class="modal-body">
-                <div class="transaction-details">
-                    <div class="transaction-detail-item">
-                        <strong>ID de la transaction:</strong>
-                        <span id="transaction-id"></span>
-                    </div>
-                    <div class="transaction-detail-item">
-                        <strong>Entrepôt:</strong>
-                        <span id="transaction-entrepot"></span>
-                    </div>
-                    <div class="transaction-detail-item">
-                        <strong>ID Batterie:</strong>
-                        <span id="transaction-battery-id"></span>
-                    </div>
-                    <div class="transaction-detail-item">
-                        <strong>VIN Batterie:</strong>
-                        <span id="transaction-battery-vin"></span>
-                    </div>
-                    <div class="transaction-detail-item">
-                        <strong>Date et heure:</strong>
-                        <span id="transaction-datetime"></span>
-                    </div>
-                    <div class="transaction-detail-item">
-                        <strong>Type d'opération:</strong>
-                        <span id="transaction-type">Ravitaillement</span>
+                <div class="mb-3">
+                    <label for="entrepot" class="form-label">Choisir un entrepôt</label>
+                    <select name="entrepot_id" id="entrepot" class="form-select" required>
+                        <option value="">Sélectionner un entrepôt</option>
+                        @foreach($entrepots as $entrepot)
+                            <option value="{{ $entrepot->id }}">{{ $entrepot->nom_entrepot }}</option>
+                        @endforeach
+                    </select>
+                </div>
+                
+                <div class="mb-3">
+                    <label class="form-label">Rechercher une batterie</label>
+                    <input type="text" class="form-control" id="modalBatterySearch" placeholder="Rechercher par ID ou VIN">
+                </div>
+                
+                <div class="mb-3">
+                    <label class="form-label">Batteries disponibles ({{ $batteries->count() }} disponibles)</label>
+                    <div class="checkbox-container" id="modalBatteriesList">
+                        @forelse($batteries as $battery)
+                            <div class="form-check mb-2 battery-item">
+                                <input type="checkbox" class="form-check-input" name="batteries[]" value="{{ $battery->id }}" id="battery-{{ $battery->id }}">
+                                <label class="form-check-label" for="battery-{{ $battery->id }}">
+                                    <strong>{{ $battery->batterie_unique_id }}</strong><br>
+                                    <span class="text-muted">VIN: {{ $battery->mac_id }}</span>
+                                </label>
+                            </div>
+                        @empty
+                            <div class="no-results">Aucune batterie disponible pour le ravitaillement.</div>
+                        @endforelse
                     </div>
                 </div>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fermer</button>
+                <button type="button" class="btn btn-secondary close-modal">Annuler</button>
+                <button type="submit" class="btn btn-primary" id="submitRavitaillementBtn">Ravitailler</button>
             </div>
+        </form>
+    </div>
+</div>
+
+<!-- Modal de détails -->
+<div id="detailsModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h5 class="modal-title">Détails du Ravitaillement</h5>
+            <span class="close-modal">&times;</span>
+        </div>
+        <div class="modal-body">
+            <div class="transaction-details">
+                <div class="transaction-detail-item">
+                    <strong>ID de la transaction:</strong>
+                    <span id="detail-id"></span>
+                </div>
+                <div class="transaction-detail-item">
+                    <strong>Entrepôt:</strong>
+                    <span id="detail-entrepot"></span>
+                </div>
+                <div class="transaction-detail-item">
+                    <strong>ID Batterie:</strong>
+                    <span id="detail-battery"></span>
+                </div>
+                <div class="transaction-detail-item">
+                    <strong>Date et heure:</strong>
+                    <span id="detail-date"></span>
+                </div>
+                <div class="transaction-detail-item">
+                    <strong>Type d'opération:</strong>
+                    <span>Ravitaillement</span>
+                </div>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button type="button" class="btn btn-secondary close-modal">Fermer</button>
         </div>
     </div>
 </div>
 
-
-</div>
-
-
-
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    // Initialisation et variables
+    // Variables globales
     const searchInput = document.getElementById('search-battery');
+    const searchBtn = document.getElementById('search-btn');
     const entrepotFilter = document.getElementById('entrepot-filter');
     const timeFilter = document.getElementById('time-filter');
     const customDatePicker = document.getElementById('custom-date');
@@ -498,100 +657,106 @@ document.addEventListener('DOMContentLoaded', function() {
     const addRavitaillementBtn = document.getElementById('add-ravitaillement');
     const modalBatterySearch = document.getElementById('modalBatterySearch');
     const modalBatteriesList = document.getElementById('modalBatteriesList');
-    
-    // Afficher la date actuelle dans l'en-tête
+    const ravitaillementModal = document.getElementById('ravitaillementModal');
+    const detailsModal = document.getElementById('detailsModal');
+    const ravitaillementForm = document.getElementById('ravitaillementForm');
+
+    // Afficher la date actuelle
     const dateElement = document.getElementById('date');
     const today = new Date();
     dateElement.textContent = today.toLocaleDateString('fr-FR');
-    
-    // Initialiser la date du sélecteur à la date du jour
     customDatePicker.valueAsDate = today;
 
-    // Gérer l'affichage du sélecteur de date
+    // Gestion des modales
+    function openModal(modal) {
+        modal.classList.add('active');
+    }
+
+    function closeModal(modal) {
+        modal.classList.remove('active');
+    }
+
+    // Event listeners pour les modales
+    document.querySelectorAll('.close-modal').forEach(closeBtn => {
+        closeBtn.addEventListener('click', function() {
+            const modal = this.closest('.modal');
+            closeModal(modal);
+        });
+    });
+
+    // Fermer les modales en cliquant à l'extérieur
+    window.addEventListener('click', function(e) {
+        if (e.target.classList.contains('modal')) {
+            closeModal(e.target);
+        }
+    });
+
+    // Ouvrir la modal de ravitaillement
+    addRavitaillementBtn.addEventListener('click', function() {
+        openModal(ravitaillementModal);
+    });
+
+    // Gestion du sélecteur de date
     timeFilter.addEventListener('change', function() {
         if (this.value === 'custom') {
             datePickerContainer.style.display = 'block';
         } else {
             datePickerContainer.style.display = 'none';
         }
+        filterRavitaillements();
     });
-    
-    // Ouvrir la modal de ravitaillement
-    addRavitaillementBtn.addEventListener('click', function() {
-        const modal = new bootstrap.Modal(document.getElementById('ravitaillementModal'));
-        modal.show();
-    });
-    
-    // Filtrer les batteries dans la modal
+
+    // Recherche dans la modal
     modalBatterySearch.addEventListener('input', function() {
         const searchTerm = this.value.toLowerCase();
         const batteries = modalBatteriesList.querySelectorAll('.battery-item');
         
         batteries.forEach(batteryItem => {
             const label = batteryItem.querySelector('.form-check-label').textContent.toLowerCase();
-            batteryItem.style.display = label.includes(searchTerm) ? '' : 'none';
+            batteryItem.style.display = label.includes(searchTerm) ? 'block' : 'none';
         });
     });
 
-    // Fonctions pour calculer les statistiques
-    function calculateStats() {
-        // Préparer les données
-        const data = {
-            timeFilter: timeFilter.value
-        };
+    // Soumission du formulaire
+    ravitaillementForm.addEventListener('submit', function(e) {
+        const checkedBatteries = this.querySelectorAll('input[name="batteries[]"]:checked');
+        const entrepotSelect = this.querySelector('#entrepot');
         
-        // Ajouter la date personnalisée si nécessaire
-        if (timeFilter.value === 'custom') {
-            data.customDate = customDatePicker.value;
+        if (!entrepotSelect.value) {
+            e.preventDefault();
+            showToast('Veuillez sélectionner un entrepôt.', 'error');
+            return;
         }
         
-        // Récupérer les données
-        fetch('/api/ravitaillements/stats', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
-            },
-            body: JSON.stringify(data)
-        })
-        .then(response => response.json())
-        .then(data => {
-            // Mettre à jour les compteurs
-            document.getElementById('total-entrepots').textContent = data.entrepotCount;
-            document.getElementById('total-ravitaillements').textContent = data.ravitaillementCount;
-            document.getElementById('batteries-disponibles').textContent = data.availableBatteries;
-            
-            // Mettre à jour les libellés de période
-            document.getElementById('ravitaillement-time-label').textContent = data.timeLabel;
-        })
-        .catch(error => {
-            console.error('Erreur lors du chargement des statistiques:', error);
-            showToast('Erreur lors du chargement des statistiques.', 'error');
-        });
-    }
+        if (checkedBatteries.length === 0) {
+            e.preventDefault();
+            showToast('Veuillez sélectionner au moins une batterie.', 'error');
+            return;
+        }
+        
+        if (!confirm(`Confirmer le ravitaillement de ${checkedBatteries.length} batterie(s) ?`)) {
+            e.preventDefault();
+        }
+    });
 
-    // Fonction pour filtrer et afficher les ravitaillements
+    // Filtrage des ravitaillements
     function filterRavitaillements() {
         const searchTerm = searchInput.value.toLowerCase();
         const entrepotValue = entrepotFilter.value;
         const timeValue = timeFilter.value;
         
-        // Préparer les données
         const data = {
             search: searchTerm,
             entrepot_id: entrepotValue,
             date_filter: timeValue
         };
         
-        // Ajouter la date personnalisée si nécessaire
         if (timeValue === 'custom') {
             data.custom_date = customDatePicker.value;
         }
         
-        // Afficher un indicateur de chargement
         ravitaillementsContent.innerHTML = '<div class="loader-container"><div class="loader"></div></div>';
 
-        // Appel à l'API pour récupérer les données filtrées
         fetch('/api/ravitaillements/filter', {
             method: 'POST',
             headers: {
@@ -602,80 +767,100 @@ document.addEventListener('DOMContentLoaded', function() {
         })
         .then(response => response.json())
         .then(data => {
-            // Vider la zone de contenu
-            ravitaillementsContent.innerHTML = '';
-            
-            // Récupérer les données par jour
-            const ravitaillesByDay = data.ravitaillesByDay;
-            const days = Object.keys(ravitaillesByDay).sort().reverse(); // Trier par date décroissante
-            
-            if (days.length === 0) {
-                ravitaillementsContent.innerHTML = '<div class="no-results">Aucun ravitaillement trouvé pour cette période.</div>';
-                return;
-            }
-            
-            // Pour chaque jour, créer une section avec un tableau
-            days.forEach(day => {
-                const ravitailles = ravitaillesByDay[day];
-                if (ravitailles.length === 0) return;
-                
-                // Formater la date pour l'affichage
-                const dateParts = day.split('-');
-                const formattedDate = `${dateParts[2]}/${dateParts[1]}/${dateParts[0]}`;
-                
-                // Créer l'en-tête de la date
-                const dateHeader = document.createElement('div');
-                dateHeader.className = 'date-header';
-                dateHeader.textContent = formattedDate;
-                ravitaillementsContent.appendChild(dateHeader);
-                
-                // Créer le tableau pour ce jour
-                const tableContainer = document.createElement('div');
-                tableContainer.className = 'table-container';
-                
-                const table = document.createElement('table');
-                table.innerHTML = `
-                    <thead>
-                        <tr>
-                            <th>Entrepôt</th>
-                            <th>ID Batterie</th>
-                            <th>VIN Batterie</th>
-                            <th>Date d'Ajout</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                    </tbody>
-                `;
-                
-                const tbody = table.querySelector('tbody');
-                
-                // Ajouter les lignes de ravitaillements
-                ravitailles.forEach(ravitaille => {
-                    const row = document.createElement('tr');
-                    row.dataset.id = ravitaille.id;
-                    
-                    row.innerHTML = `
-                        <td>${ravitaille.entrepot}</td>
-                        <td>${ravitaille.batterie_id}</td>
-                        <td>${ravitaille.batterie_vin}</td>
-                        <td>${ravitaille.date}</td>
-                    `;
-                    
-                    tbody.appendChild(row);
-                });
-                
-                tableContainer.appendChild(table);
-                ravitaillementsContent.appendChild(tableContainer);
-            });
+            displayFilteredResults(data);
         })
         .catch(error => {
-            console.error('Erreur lors du filtrage des données:', error);
+            console.error('Erreur:', error);
             showToast('Erreur lors du filtrage des données.', 'error');
-            ravitaillementsContent.innerHTML = '<div class="no-results">Erreur lors du chargement des données. Veuillez réessayer.</div>';
+            ravitaillementsContent.innerHTML = '<div class="no-results">Erreur lors du chargement des données.</div>';
         });
     }
 
-    // Fonction pour afficher les messages toast
+    function displayFilteredResults(data) {
+        ravitaillementsContent.innerHTML = '';
+        
+        const ravitaillesByDay = data.ravitaillesByDay;
+        const days = Object.keys(ravitaillesByDay).sort().reverse();
+        
+        if (days.length === 0) {
+            ravitaillementsContent.innerHTML = '<div class="no-results">Aucun ravitaillement trouvé pour cette période.</div>';
+            return;
+        }
+        
+        days.forEach(day => {
+            const ravitailles = ravitaillesByDay[day];
+            if (ravitailles.length === 0) return;
+            
+            const dateParts = day.split('-');
+            const formattedDate = `${dateParts[2]}/${dateParts[1]}/${dateParts[0]}`;
+            
+            const dateHeader = document.createElement('div');
+            dateHeader.className = 'date-header';
+            dateHeader.textContent = formattedDate;
+            ravitaillementsContent.appendChild(dateHeader);
+            
+            const tableContainer = document.createElement('div');
+            tableContainer.className = 'table-container';
+            
+            const table = document.createElement('table');
+            table.innerHTML = `
+                <thead>
+                    <tr>
+                        <th>Entrepôt</th>
+                        <th>ID Batterie</th>
+                        <th>VIN Batterie</th>
+                        <th>Date d'Ajout</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            `;
+            
+            const tbody = table.querySelector('tbody');
+            
+            ravitailles.forEach(ravitaille => {
+                const row = document.createElement('tr');
+                row.dataset.id = ravitaille.id;
+                
+                row.innerHTML = `
+                    <td>${ravitaille.entrepot}</td>
+                    <td>${ravitaille.batterie_id}</td>
+                    <td>${ravitaille.batterie_vin}</td>
+                    <td>${ravitaille.date}</td>
+                    <td>
+                        <button class="btn btn-secondary btn-sm view-details" 
+                                data-id="${ravitaille.id}"
+                                data-entrepot="${ravitaille.entrepot}"
+                                data-battery="${ravitaille.batterie_id}"
+                                data-date="${ravitaille.date}">
+                            Détails
+                        </button>
+                    </td>
+                `;
+                
+                tbody.appendChild(row);
+            });
+            
+            tableContainer.appendChild(table);
+            ravitaillementsContent.appendChild(tableContainer);
+        });
+    }
+
+    // Affichage des détails
+    document.addEventListener('click', function(e) {
+        if (e.target.classList.contains('view-details')) {
+            const btn = e.target;
+            
+            document.getElementById('detail-id').textContent = btn.dataset.id;
+            document.getElementById('detail-entrepot').textContent = btn.dataset.entrepot;
+            document.getElementById('detail-battery').textContent = btn.dataset.battery;
+            document.getElementById('detail-date').textContent = btn.dataset.date;
+            
+            openModal(detailsModal);
+        }
+    });
+
+    // Fonction pour afficher les toasts
     function showToast(message, type = 'info') {
         let toastContainer = document.querySelector('.toast-container');
         if (!toastContainer) {
@@ -696,7 +881,13 @@ document.addEventListener('DOMContentLoaded', function() {
         }, 3000);
     }
 
-    // Fonction debounce pour limiter les appels lors de la recherche
+    // Event listeners pour les filtres
+    searchBtn.addEventListener('click', filterRavitaillements);
+    searchInput.addEventListener('keyup', debounce(filterRavitaillements, 500));
+    entrepotFilter.addEventListener('change', filterRavitaillements);
+    customDatePicker.addEventListener('change', filterRavitaillements);
+
+    // Fonction debounce
     function debounce(func, wait) {
         let timeout;
         return function(...args) {
@@ -705,90 +896,9 @@ document.addEventListener('DOMContentLoaded', function() {
         };
     }
 
-    // Événements pour les filtres et la recherche
-    searchInput.addEventListener('input', debounce(filterRavitaillements, 500));
-    entrepotFilter.addEventListener('change', filterRavitaillements);
-    timeFilter.addEventListener('change', function() {
-        if (this.value === 'custom') {
-            datePickerContainer.style.display = 'block';
-        } else {
-            datePickerContainer.style.display = 'none';
-        }
-        filterRavitaillements();
-        calculateStats();
-    });
-    
-    // Événement pour le changement de date personnalisée
-    customDatePicker.addEventListener('change', function() {
-        if (timeFilter.value === 'custom') {
-            filterRavitaillements();
-            calculateStats();
-        }
-    });
-
-    // Afficher les messages de session Laravel
-    @if(session('success'))
-    showToast("{{ session('success') }}", 'success');
-    @endif
-
-    @if(session('error'))
-    showToast("{{ session('error') }}", 'error');
-    @endif
-
-    // Initialisation - Calculer les statistiques au chargement
-    calculateStats();
-    
-    // Par défaut, filtrer pour afficher tous les ravitaillements
-    filterRavitaillements();
-});
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-// Afficher les détails d'une transaction
-document.addEventListener('click', function(e) {
-    // Vérifier si l'élément cliqué est une ligne de tableau
-    if (e.target.closest('tr[data-id]')) {
-        const row = e.target.closest('tr[data-id]');
-        const id = row.dataset.id;
-        
-        // Récupérer les données de la ligne
-        const entrepot = row.cells[0].textContent;
-        const batterieId = row.cells[1].textContent;
-        const batterieVin = row.cells[2].textContent;
-        const dateTime = row.cells[3].textContent;
-        
-        // Mettre à jour la modal avec les données
-        document.getElementById('transaction-id').textContent = id;
-        document.getElementById('transaction-entrepot').textContent = entrepot;
-        document.getElementById('transaction-battery-id').textContent = batterieId;
-        document.getElementById('transaction-battery-vin').textContent = batterieVin;
-        document.getElementById('transaction-datetime').textContent = dateTime;
-        
-        // Afficher la modal
-        const modal = new bootstrap.Modal(document.getElementById('transactionDetailsModal'));
-        modal.show();
-    }
-});
-
-
-
-// Événements pour les onglets
-
+    // Navigation par onglets
     document.querySelectorAll('.nav-tab').forEach(tab => {
-        tab.addEventListener('click', function () {
+        tab.addEventListener('click', function() {
             const url = this.getAttribute('data-url');
             if (url) {
                 window.location.href = url;
@@ -796,9 +906,221 @@ document.addEventListener('click', function(e) {
         });
     });
 
+    // Messages de session
+    @if(session('success'))
+        showToast("{{ session('success') }}", 'success');
+        // Recharger les données après un ravitaillement réussi
+        setTimeout(() => {
+            window.location.reload();
+        }, 2000);
+    @endif
 
+    @if(session('error'))
+        showToast("{{ session('error') }}", 'error');
+    @endif
+
+    // Styles supplémentaires pour les détails de transaction
+    const transactionDetailStyles = `
+        .transaction-details {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+        
+        .transaction-detail-item {
+            display: flex;
+            justify-content: space-between;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #eee;
+        }
+        
+        .transaction-detail-item:last-child {
+            border-bottom: none;
+        }
+        
+        .btn-sm {
+            padding: 4px 8px;
+            font-size: 12px;
+        }
+        
+        .pagination-container {
+            display: flex;
+            justify-content: center;
+            margin-top: 20px;
+        }
+        
+        .nav-tabs {
+            display: flex;
+            border-bottom: 1px solid #ddd;
+            margin-bottom: 20px;
+        }
+        
+        .nav-tab {
+            padding: 10px 20px;
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+            transition: all 0.3s ease;
+        }
+        
+        .nav-tab:hover {
+            background-color: var(--tertiary);
+        }
+        
+        .nav-tab.active {
+            border-bottom-color: var(--primary);
+            background-color: var(--tertiary);
+            font-weight: bold;
+        }
+        
+        .content-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        
+        .content-header h2 {
+            margin: 0;
+            color: var(--text);
+        }
+        
+        .date {
+            color: #6c757d;
+            font-size: 14px;
+        }
+    `;
     
-</script>
+    // Ajouter les styles à la page
+    const styleSheet = document.createElement('style');
+    styleSheet.textContent = transactionDetailStyles;
+    document.head.appendChild(styleSheet);
+});
 
+// Fonction pour mettre à jour les statistiques en temps réel
+function updateStats() {
+    fetch('/api/ravitaillements/stats', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+        },
+        body: JSON.stringify({
+            timeFilter: 'today'
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.entrepotCount !== undefined) {
+            document.getElementById('total-entrepots').textContent = data.entrepotCount;
+        }
+        if (data.availableBatteries !== undefined) {
+            document.getElementById('batteries-disponibles').textContent = data.availableBatteries;
+        }
+    })
+    .catch(error => {
+        console.error('Erreur lors de la mise à jour des statistiques:', error);
+    });
+}
+
+// Mettre à jour les statistiques toutes les 30 secondes
+setInterval(updateStats, 30000);
+
+// Fonction pour valider le formulaire avant soumission
+function validateForm() {
+    const entrepotSelect = document.getElementById('entrepot');
+    const checkedBatteries = document.querySelectorAll('input[name="batteries[]"]:checked');
+    
+    let isValid = true;
+    let errors = [];
+    
+    if (!entrepotSelect.value) {
+        errors.push('Veuillez sélectionner un entrepôt.');
+        isValid = false;
+    }
+    
+    if (checkedBatteries.length === 0) {
+        errors.push('Veuillez sélectionner au moins une batterie.');
+        isValid = false;
+    }
+    
+    if (!isValid) {
+        errors.forEach(error => {
+            showToast(error, 'error');
+        });
+    }
+    
+    return isValid;
+}
+
+// Fonction pour sélectionner/désélectionner toutes les batteries
+function toggleAllBatteries() {
+    const checkboxes = document.querySelectorAll('input[name="batteries[]"]:not([style*="display: none"])');
+    const allChecked = Array.from(checkboxes).every(cb => cb.checked);
+    
+    checkboxes.forEach(checkbox => {
+        checkbox.checked = !allChecked;
+    });
+}
+
+// Ajouter un bouton pour sélectionner toutes les batteries
+document.addEventListener('DOMContentLoaded', function() {
+    const batteriesLabel = document.querySelector('label[for="modalBatteriesList"]') || 
+                          document.querySelector('.form-label:last-of-type');
+    
+    if (batteriesLabel && batteriesLabel.textContent.includes('Batteries disponibles')) {
+        const toggleButton = document.createElement('button');
+        toggleButton.type = 'button';
+        toggleButton.className = 'btn btn-secondary btn-sm ml-2';
+        toggleButton.textContent = 'Tout sélectionner/désélectionner';
+        toggleButton.onclick = toggleAllBatteries;
+        
+        batteriesLabel.appendChild(toggleButton);
+    }
+});
+
+// Fonction pour compter les batteries sélectionnées
+function updateSelectedCount() {
+    const checkedBatteries = document.querySelectorAll('input[name="batteries[]"]:checked');
+    const submitBtn = document.getElementById('submitRavitaillementBtn');
+    
+    if (submitBtn) {
+        if (checkedBatteries.length > 0) {
+            submitBtn.textContent = `Ravitailler (${checkedBatteries.length})`;
+            submitBtn.disabled = false;
+        } else {
+            submitBtn.textContent = 'Ravitailler';
+            submitBtn.disabled = false;
+        }
+    }
+}
+
+// Écouter les changements de sélection des batteries
+document.addEventListener('change', function(e) {
+    if (e.target.name === 'batteries[]') {
+        updateSelectedCount();
+    }
+});
+
+// Fonction pour réinitialiser le formulaire
+function resetForm() {
+    const form = document.getElementById('ravitaillementForm');
+    if (form) {
+        form.reset();
+        updateSelectedCount();
+    }
+}
+
+// Ajouter la fonctionnalité de réinitialisation
+document.addEventListener('DOMContentLoaded', function() {
+    const modalCloseButtons = document.querySelectorAll('.close-modal');
+    modalCloseButtons.forEach(btn => {
+        btn.addEventListener('click', function() {
+            if (this.closest('#ravitaillementModal')) {
+                resetForm();
+            }
+        });
+    });
+});
+</script>
 
 @endsection

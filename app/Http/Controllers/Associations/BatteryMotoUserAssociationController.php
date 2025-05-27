@@ -10,6 +10,7 @@ use App\Models\ValidatedUser;
 use App\Models\AssociationUserMoto;
 use App\Models\BatteryMotoUserAssociation;
 use App\Models\BMSData;
+use App\Models\BatteryAgence;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\DB;
@@ -566,104 +567,92 @@ public function update(Request $request, $id)
     try {
         Log::info("Tentative de mise à jour de l'association ID: {$id}");
         Log::info('Données reçues: ' . json_encode($request->all()));
-        
-        // Valider les données
+
+        // Validation des données
         $validator = Validator::make($request->all(), [
             'battery_unique_id' => 'required|exists:batteries_valides,batterie_unique_id',
             'moto_unique_id' => 'required|exists:motos_valides,moto_unique_id',
-        ], [
-            'battery_unique_id.required' => 'Vous devez sélectionner une batterie.',
-            'battery_unique_id.exists' => 'La batterie sélectionnée n\'existe pas.',
-            'moto_unique_id.required' => 'Vous devez sélectionner une moto.',
-            'moto_unique_id.exists' => 'La moto sélectionnée n\'existe pas.',
         ]);
-        
+
         if ($validator->fails()) {
-            Log::warning('Validation échouée: ' . json_encode($validator->errors()->toArray()));
             return response()->json([
                 'success' => false,
                 'message' => 'Erreur de validation: ' . implode(' ', $validator->errors()->all())
             ], 422);
         }
-        
-        // Trouver l'association à mettre à jour
+
+        // Récupérer l'association actuelle
         $association = BatteryMotoUserAssociation::findOrFail($id);
-        
-        // Récupérer les valeurs unique_id de la requête
+
+        // Identifiants depuis la requête
         $batteryUniqueId = $request->input('battery_unique_id');
         $motoUniqueId = $request->input('moto_unique_id');
-        
-        // Rechercher la moto et la batterie en utilisant les unique_id
+
+        // Récupération des objets liés
         $moto = MotosValide::where('moto_unique_id', $motoUniqueId)->first();
         $batterie = BatteriesValide::where('batterie_unique_id', $batteryUniqueId)->first();
-        
-        if (!$moto) {
-            Log::warning("Moto non trouvée: {$motoUniqueId}");
+
+        if (!$moto || !$batterie) {
             return response()->json([
                 'success' => false,
-                'message' => 'Moto non trouvée dans la table des motos valides.'
+                'message' => 'Moto ou batterie introuvable.'
             ], 404);
         }
-        
-        if (!$batterie) {
-            Log::warning("Batterie non trouvée: {$batteryUniqueId}");
-            return response()->json([
-                'success' => false,
-                'message' => 'Batterie non trouvée dans la table des batteries valides.'
-            ], 404);
-        }
-        
-        // Vérifier si la batterie est déjà associée à une autre moto
+
+        // Vérifier si la batterie est déjà utilisée ailleurs
         $existingBatteryAssociation = BatteryMotoUserAssociation::where('battery_id', $batterie->id)
             ->where('id', '!=', $id)
             ->first();
-            
+
         if ($existingBatteryAssociation) {
             return response()->json([
                 'success' => false,
-                'message' => 'Cette batterie est déjà associée à une autre moto. Veuillez d\'abord supprimer cette association.'
+                'message' => 'Cette batterie est déjà associée à une autre moto.'
             ], 400);
         }
-        
-        // Récupérer l'association utilisateur-moto en utilisant l'ID de la moto
+
+        // Vérifier l'association utilisateur-moto
         $motoAssociation = AssociationUserMoto::where('moto_valide_id', $moto->id)->first();
-        
         if (!$motoAssociation) {
-            Log::warning("Association utilisateur-moto non trouvée pour la moto: {$moto->id}");
             return response()->json([
                 'success' => false,
                 'message' => 'Aucune association utilisateur-moto trouvée pour cette moto.'
             ], 404);
         }
-        
+
+        // 🔒 DÉBUT DE TRANSACTION
         DB::beginTransaction();
-        
-        // Mettre à jour l'association avec les IDs (pas les unique_ids)
+
+        // 🔍 Supprimer cette batterie de battery_agences si elle y est
+        $batteryAgence = BatteryAgence::where('id_battery_valide', $batterie->id)->first();
+        if ($batteryAgence) {
+            Log::info("Suppression de battery_agences pour la batterie ID: {$batterie->id}");
+            $batteryAgence->delete();
+        }
+
+        // 🛠️ Mise à jour de l'association
         $association->association_user_moto_id = $motoAssociation->id;
         $association->battery_id = $batterie->id;
         $association->updated_at = now();
         $association->save();
-        
+
         DB::commit();
-        
-        Log::info("Association ID {$id} mise à jour avec succès");
-        
+
         return response()->json([
             'success' => true,
             'message' => "L'association a été mise à jour avec succès."
         ]);
-        
+
     } catch (\Exception $e) {
         DB::rollBack();
-        Log::error("Erreur lors de la mise à jour de l'association: " . $e->getMessage());
-        Log::error($e->getTraceAsString());
-        
+        Log::error("Erreur dans update(): " . $e->getMessage());
         return response()->json([
             'success' => false,
-            'message' => "Une erreur est survenue lors de la mise à jour de l'association: " . $e->getMessage()
+            'message' => "Erreur lors de la mise à jour : " . $e->getMessage()
         ], 500);
     }
 }
+
     
     /**
      * Supprimer une association

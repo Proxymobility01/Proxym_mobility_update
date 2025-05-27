@@ -298,29 +298,32 @@ class LocalisationController extends Controller
      * @return void
      */
     private function envoyerAlerteEmployes($moto, $point, $userInfo, $type = 'sortie')
-    {
-        $employes = Employe::all();
-        
-        if ($type === 'sortie') {
-            $subject = "ALERTE - Moto sortie de zone Douala";
-            $body = "La moto VIN: {$moto->vin}\nMacID: {$moto->gps_imei}\nCoordonnées: Latitude {$point['lat']} / Longitude {$point['lng']}\nChauffeur: {$userInfo}\nSituation: ❌ HORS DE LA ZONE DOUALA";
-        } else {
-            $subject = "INFO - Moto revenue en zone Douala";
-            $body = "La moto VIN: {$moto->vin}\nMacID: {$moto->gps_imei}\nCoordonnées: Latitude {$point['lat']} / Longitude {$point['lng']}\nChauffeur: {$userInfo}\nSituation: ✅ DE RETOUR DANS LA ZONE DOUALA";
-        }
+{
+    $employes = Employe::all();
 
-        foreach ($employes as $employe) {
+    if ($type === 'sortie') {
+        $subject = "ALERTE - Moto sortie de zone Douala";
+        $body = "La moto VIN: {$moto->vin}\nMacID: {$moto->gps_imei}\nCoordonnées: Latitude {$point['lat']} / Longitude {$point['lng']}\nChauffeur: {$userInfo}\nSituation: ❌ HORS DE LA ZONE DOUALA";
+    } else {
+        $subject = "INFO - Moto revenue en zone Douala";
+        $body = "La moto VIN: {$moto->vin}\nMacID: {$moto->gps_imei}\nCoordonnées: Latitude {$point['lat']} / Longitude {$point['lng']}\nChauffeur: {$userInfo}\nSituation: ✅ DE RETOUR DANS LA ZONE DOUALA";
+    }
+
+    foreach ($employes as $employe) {
+        try {
             Mail::raw($body, function ($message) use ($employe, $subject) {
                 $message->to($employe->email)
                         ->subject($subject)
                         ->from('patrick.bika@proxymgroup.com', 'Proxym Group');
             });
-
             Log::info("📧 Mail envoyé à {$employe->email} pour la moto VIN: {$moto->vin} - Type: {$type}");
+        } catch (\Throwable $e) {
+            Log::error("❌ Échec d'envoi à {$employe->email} : " . $e->getMessage());
         }
-
-        Log::info("📨 Tous les mails d'alerte ont été envoyés pour la moto VIN: {$moto->vin} - Type: {$type}");
     }
+
+    Log::info("📨 Traitement d'envoi terminé pour VIN: {$moto->vin} - Type: {$type}");
+}
 
     private function doualaCoordinates()
     {

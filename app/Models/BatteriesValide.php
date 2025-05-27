@@ -63,4 +63,12 @@ public function swapsOut()
 {
     return $this->hasMany(Swap::class, 'battery_out_id');
 }
+
+public function batteryMotoUserAssociations()
+{
+    return $this->hasMany(BatteryMotoUserAssociation::class, 'battery_id');
+}
+
+
+
 }

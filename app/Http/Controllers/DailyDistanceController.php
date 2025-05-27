@@ -318,7 +318,7 @@ class DailyDistanceController extends Controller
         $formattedDistances = [];
         foreach ($distances as $distance) {
             $formattedDistances[] = [
-                'id' => $distance->user->id,
+                'id' => $distance->user->user_unique_id,
                 'name' => ($distance->user->prenom ?? '') . ' ' . ($distance->user->nom ?? 'N/A'),
                 'phone' => $distance->user->phone ?? 'N/A',
                 'distance_km' => number_format($distance->total_distance_km, 2),
@@ -327,7 +327,11 @@ class DailyDistanceController extends Controller
                 'hourly_distribution' => [],
                 'created_at' => $distance->created_at->format('Y-m-d H:i:s'),
                 'updated_at' => $distance->updated_at->format('Y-m-d H:i:s'),
+<<<<<<< HEAD
                 'date' => $distance->updated_at->format('Y-m-d'), // Date formatée à partir de updated_at
+=======
+                'date' => $distance->created_at->format('Y-m-d'), // Date formatée à partir de updated_at
+>>>>>>> bdcca81 (version stable avec authentifiacation et ravitaillement et gestion efficasse des stations)
                 'time' => $distance->updated_at->format('H:i:s'), // Heure formatée à partir de updated_at
             ];
         }
@@ -652,4 +656,105 @@ class DailyDistanceController extends Controller
     {
         return $this->updateDailyDistancesForDate(Carbon::today()->toDateString());
     }
+
+
+
+    public function recalculerDistanceParPlage()
+{
+    // 🔐 Définir manuellement la plage de dates (exemple du 1er au 7 mai 2025)
+    $startDate = Carbon::createFromFormat('Y-m-d', '2025-05-01')->startOfDay();
+    $endDate = Carbon::createFromFormat('Y-m-d', '2025-05-23')->endOfDay();
+
+    Log::info("Début du recalcul des distances du {$startDate} au {$endDate}");
+
+    $currentDate = $startDate->copy();
+    $resultats = [];
+
+    while ($currentDate->lte($endDate)) {
+        $dateStr = $currentDate->toDateString();
+        Log::info("🔄 Traitement de la date : {$dateStr}");
+
+        // Récupération des associations chauffeur - moto
+        $associations = AssociationUserMoto::with(['validatedUser', 'motosValide'])->get();
+
+        foreach ($associations as $association) {
+            if (!$association->validatedUser || !$association->motosValide || !$association->motosValide->gps_imei) {
+                continue;
+            }
+
+            $user = $association->validatedUser;
+            $moto = $association->motosValide;
+            $macId = $moto->gps_imei;
+
+            // Points GPS de la journée
+            $gpsPoints = GpsLocation::where('macid', $macId)
+                ->whereBetween('created_at', [
+                    $currentDate->copy()->startOfDay(),
+                    $currentDate->copy()->endOfDay()
+                ])
+                ->orderBy('created_at', 'asc')
+                ->get();
+
+            if ($gpsPoints->count() < 2) {
+                continue;
+            }
+
+            $totalDistance = 0;
+            $lastLocation = null;
+
+            for ($i = 1; $i < $gpsPoints->count(); $i++) {
+                $prev = $gpsPoints[$i - 1];
+                $curr = $gpsPoints[$i];
+
+                if (($prev->latitude == 0 && $prev->longitude == 0) ||
+                    ($curr->latitude == 0 && $curr->longitude == 0)) {
+                    continue;
+                }
+
+                $distance = $this->calculateDistance(
+                    $prev->latitude, $prev->longitude,
+                    $curr->latitude, $curr->longitude
+                );
+
+                if ($distance < 50) {
+                    $totalDistance += $distance;
+                    $lastLocation = "Lat: {$curr->latitude}, Lng: {$curr->longitude}";
+                }
+            }
+
+            $totalDistance = round($totalDistance, 2);
+
+            // 🔁 Créer ou mettre à jour l'enregistrement
+            DailyDistance::updateOrCreate(
+                [
+                    'user_id' => $user->id,
+                    'date' => $dateStr
+                ],
+                [
+                    'total_distance_km' => $totalDistance,
+                    'last_location' => $lastLocation ?? 'N/A',
+                    'last_updated' => now()
+                ]
+            );
+
+            $resultats[] = [
+                'date' => $dateStr,
+                'chauffeur' => "{$user->prenom} {$user->nom}",
+                'user_id' => $user->id,
+                'distance_km' => $totalDistance
+            ];
+        }
+
+        $currentDate->addDay();
+    }
+
+    Log::info("✅ Recalcul terminé");
+
+    return response()->json([
+        'success' => true,
+        'message' => 'Recalcul effectué avec succès.',
+        'résultats' => $resultats
+    ]);
+}
+
 }

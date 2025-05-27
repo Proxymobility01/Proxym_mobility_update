@@ -16,20 +16,26 @@ class HistoriqueEntrepot extends Model
         'bat_sortante', 
         'bat_entrante', 
         'type_swap', 
-        'date_time',
     ];
 
     // Relation avec l'entrepôt
     public function entrepot()
     {
-        return $this->belongsTo(Entrepots::class, 'id_entrepot');
+        return $this->belongsTo(Entrepot::class, 'id_entrepot');
     }
 
     // Relation avec le distributeur
     public function distributeur()
     {
-        return $this->belongsTo(Distributeurs::class, 'id_distributeur');
+        return $this->belongsTo(Distributeur::class, 'id_distributeur');
     }
+
+
+    public function batteryValide()
+{
+    return $this->belongsTo(BatteriesValide::class, 'id_battery_valide');
+}
+
 
 
 

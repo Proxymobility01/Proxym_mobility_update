@@ -23,7 +23,29 @@ Route::get('/', function () {
     return view('welcome');
 });
 
-Route::get('/', [DashboardController::class, 'index'])->middleware(['auth', 'verified'])->name('dashboard');
+//Route::get('/', [DashboardController::class, 'index'])->middleware(['auth', 'verified'])->name('dashboard');
+
+// Routes du Dashboard
+Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard.index');
+Route::get('/dashboard/filter', [DashboardController::class, 'filter'])->name('dashboard.filter');
+Route::get('/dashboard/refresh', [DashboardController::class, 'refreshData'])->name('dashboard.refresh');
+Route::get('/dashboard/swap-evolution', [DashboardController::class, 'swapEvolution'])->name('dashboard.swap_evolution');
+Route::get('/api/inactive_batteries', [DashboardController::class, 'getInactiveBatteries'])->name('api.inactive_batteries');
+Route::get('/api/batteries/{id}', [DashboardController::class, 'getBatteryDetails']);
+
+
+
+
+Route::get('/recalculer-distances', [\App\Http\Controllers\DailyDistanceController::class, 'recalculerDistanceParPlage'])
+    ->name('recalculer.distances');
+
+
+
+// Routes API pour les batteries
+Route::prefix('api')->group(function () {
+    Route::get('/inactive-batteries', [DashboardController::class, 'getInactiveBatteries'])->name('api.inactive_batteries');
+    Route::get('/batteries/{id}', [DashboardController::class, 'getBatteryDetails'])->name('api.battery_details');
+});
 
 Route::middleware('auth')->group(function () {
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
@@ -97,6 +119,8 @@ Route::middleware('auth')->group(function () {
         Route::put('/batteries/{id}', [BatteryMotoUserAssociationController::class, 'update']);
         Route::delete('/batteries/{id}', [BatteryMotoUserAssociationController::class, 'destroy']);
     });
+    Route::patch('/associations/batteries/{id}/desassociate', [BatteryMotoUserAssociationController::class, 'desassociate'])->name('associations.batterie.moto.user.desassociate');
+
 
     // Chauffeurs
     Route::resource('chauffeurs', ChauffeurController::class)->except(['create', 'show']);
@@ -136,6 +160,17 @@ Route::middleware('auth')->group(function () {
     Route::post('/swaps/handle', [App\Http\Controllers\Associations\SwapController::class, 'handleSwap'])->name('swaps.handle');
     Route::post('/api/swaps/filter', [App\Http\Controllers\Associations\SwapController::class, 'filterSwaps']);
     Route::post('/api/swaps/stats', [App\Http\Controllers\Associations\SwapController::class, 'getStats']);
+
+
+
+
+      // Route principale pour afficher la page des swaps par chauffeur
+      Route::get('/swaps-chauffeur', [App\Http\Controllers\Associations\SwapChauffeurController::class, 'index'])->name('swaps.chauffeur.index');
+    
+      // Routes API pour le filtrage et les statistiques des swaps par chauffeur
+      Route::post('/api/swaps-chauffeur/filter', [App\Http\Controllers\Associations\SwapChauffeurController::class, 'filterSwaps'])->name('api.swaps.chauffeur.filter');
+      Route::post('/api/swaps-chauffeur/stats', [App\Http\Controllers\Associations\SwapChauffeurController::class, 'getStats'])->name('api.swaps.chauffeur.stats');
+      
 
     // Ravitaillements
     Route::prefix('ravitaillements')->group(function () {
