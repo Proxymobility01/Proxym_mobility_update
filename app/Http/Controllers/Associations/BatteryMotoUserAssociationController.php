@@ -10,11 +10,12 @@ use App\Models\ValidatedUser;
 use App\Models\AssociationUserMoto;
 use App\Models\BatteryMotoUserAssociation;
 use App\Models\BMSData;
-use App\Models\BatteryAgence;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use App\Models\BatteryAgence;
+
 
 class BatteryMotoUserAssociationController extends Controller
 {
@@ -562,6 +563,7 @@ if ($existingBatteryAssociation) {
 /**
  * Mettre à jour une association existante
  */
+
 public function update(Request $request, $id)
 {
     try {

@@ -504,13 +504,13 @@ tr:hover {
         @if($ravitailles->count() > 0)
             @php
                 $groupedRavitailles = $ravitailles->groupBy(function($item) {
-                    return $item->created_at->format('Y-m-d');
+                     return $item->created_at ? $item->created_at->format('Y-m-d') : 'date_inconnue';
                 });
             @endphp
             
             @foreach($groupedRavitailles as $date => $dailyRavitailles)
                 <div class="date-header">
-                    {{ \Carbon\Carbon::parse($date)->format('d/m/Y') }}
+                   {{ $date !== 'date_inconnue' ? \Carbon\Carbon::parse($date)->format('d/m/Y') : 'Date inconnue' }}
                 </div>
                 
                 <div class="table-container">
@@ -530,13 +530,14 @@ tr:hover {
                                     <td>{{ $ravitaille->entrepot->nom_entrepot ?? 'N/A' }}</td>
                                     <td>{{ $ravitaille->batteryValide->batterie_unique_id ?? $ravitaille->bat_entrante }}</td>
                                     <td>{{ $ravitaille->distributeur->name ?? 'N/A' }}</td>
-                                    <td>{{ $ravitaille->created_at->format('d/m/Y H:i') }}</td>
+                                    <td>{{ $ravitaille->created_at ? $ravitaille->created_at->format('d/m/Y H:i') : 'Date inconnue' }}</td>
                                     <td>
                                         <button class="btn btn-secondary btn-sm view-details" 
                                                 data-id="{{ $ravitaille->id }}"
                                                 data-entrepot="{{ $ravitaille->entrepot->nom_entrepot ?? 'N/A' }}"
                                                 data-battery="{{ $ravitaille->batteryValide->batterie_unique_id ?? $ravitaille->bat_entrante }}"
-                                                data-date="{{ $ravitaille->created_at->format('d/m/Y H:i') }}">
+                                                data-date="{{ $ravitaille->created_at ? $ravitaille->created_at->format('d/m/Y H:i') : 'Date inconnue' }}"
+>
                                             Détails
                                         </button>
                                     </td>

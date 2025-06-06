@@ -327,11 +327,7 @@ class DailyDistanceController extends Controller
                 'hourly_distribution' => [],
                 'created_at' => $distance->created_at->format('Y-m-d H:i:s'),
                 'updated_at' => $distance->updated_at->format('Y-m-d H:i:s'),
-<<<<<<< HEAD
-                'date' => $distance->updated_at->format('Y-m-d'), // Date formatée à partir de updated_at
-=======
                 'date' => $distance->created_at->format('Y-m-d'), // Date formatée à partir de updated_at
->>>>>>> bdcca81 (version stable avec authentifiacation et ravitaillement et gestion efficasse des stations)
                 'time' => $distance->updated_at->format('H:i:s'), // Heure formatée à partir de updated_at
             ];
         }

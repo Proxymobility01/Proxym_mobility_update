@@ -29,6 +29,9 @@ class BatteryAgence extends Model
     // Relation avec l'agence
     public function agence()
     {
-        return $this->belongsTo(Agences::class, 'id_agence');
+        return $this->belongsTo(Agence::class, 'id_agence');
     }
+
+
+
 }

@@ -1,772 +1,508 @@
 <?php
-
 namespace App\Http\Controllers;
 
-use Illuminate\Http\Request;
-use App\Models\BatteriesValide;
-use App\Models\BatteryAgence;
 use App\Models\Agence;
-use App\Models\BMSData;
+use App\Models\BatteriesValide;
 use App\Models\Swap;
-use Illuminate\Support\Facades\Log;
+use App\Models\BMSData;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Carbon\Carbon;
-use Exception;
-use Illuminate\Support\Facades\DB;
 
 class DashboardController extends Controller
 {
     public function index(Request $request)
     {
         try {
-            // Récupération des paramètres
-            $stations = Agence::all();
-            $selectedStation = $request->input('station', 'all');
-            $timeFilter = $request->input('time_filter', 'week');
-            $periodFilter = $request->input('period_filter', 'current');
+            $stationId = $request->get('station', 'all');
+            $timeFilter = $request->get('time_filter', 'month');
+            $periodFilter = $request->get('period_filter', 'current');
 
-            // Récupération des données des batteries
-            $batteryData = $this->getAllBatteryBmsData(BatteriesValide::all());
+            // Debug: afficher les informations de base
+            \Log::info("=== DEBUT DEBUG DASHBOARD ===");
+            \Log::info("Nombre total de batteries: " . BatteriesValide::count());
+            \Log::info("Nombre total d'agences: " . Agence::count());
+
+            // Récupération des données batteries avec BMS
+            $batteries = $this->getAllBatteryBmsData(BatteriesValide::all());
+            
+            // Debug: afficher un échantillon des données batteries
+            \Log::info("Premier échantillon de batterie: " . json_encode($batteries->first()));
             
             // Statistiques globales
-            $globalStats = $this->getGlobalStats($batteryData);
+            $summaryStats = $this->getSummaryStats($batteries);
+            \Log::info("Statistiques globales: " . json_encode($summaryStats));
+            
+            // Statistiques par paliers de charge
+            $levelStats = $this->getLevelStats($batteries);
             
             // Statistiques par station
-            $stationStats = $this->getStationBatteryStats($batteryData);
-
-            // Sélection des données en fonction de la station choisie
-            if ($selectedStation !== 'all') {
-                $selectedStationData = $this->getStationData($selectedStation, $batteryData);
-                $summaryStats = $selectedStationData['summary'];
-                $levelStats = $selectedStationData['levels'];
-            } else {
-                $summaryStats = $globalStats['summary'];
-                $levelStats = $globalStats['levels'];
-            }
-
-            return view('dashboard', compact(
-                'stations', 'selectedStation', 'timeFilter', 'periodFilter',
-                'summaryStats', 'levelStats', 'stationStats'
-            ));
-        } catch (Exception $e) {
-            Log::error('Erreur dans DashboardController@index: ' . $e->getMessage());
-            return view('dashboard', ['error' => 'Erreur lors du chargement du dashboard: ' . $e->getMessage()]);
-        }
-    }
-
-    public function filter(Request $request)
-    {
-        try {
-            // Récupération des paramètres
-            $stations = Agence::all();
-            $selectedStation = $request->input('station', 'all');
-            $timeFilter = $request->input('time_filter', 'week');
-            $periodFilter = $request->input('period_filter', 'current');
-
-            // Récupération des données des batteries
-            $batteryData = $this->getAllBatteryBmsData(BatteriesValide::all());
+            $stationStats = $this->getStationStats($batteries);
+            \Log::info("Statistiques par station: " . json_encode($stationStats));
             
-            // Statistiques globales
-            $globalStats = $this->getGlobalStats($batteryData);
+            // Données filtées selon la station sélectionnée
+            $filteredData = $this->getFilteredData($batteries, $stationId);
             
-            // Statistiques par station
-            $stationStats = $this->getStationBatteryStats($batteryData);
-
-            // Sélection des données en fonction de la station choisie
-            if ($selectedStation !== 'all') {
-                $selectedStationData = $this->getStationData($selectedStation, $batteryData);
-                $summaryStats = $selectedStationData['summary'];
-                $levelStats = $selectedStationData['levels'];
-            } else {
-                $summaryStats = $globalStats['summary'];
-                $levelStats = $globalStats['levels'];
-            }
-
-            return view('dashboard', compact(
-                'stations', 'selectedStation', 'timeFilter', 'periodFilter',
-                'summaryStats', 'levelStats', 'stationStats'
-            ));
-        } catch (Exception $e) {
-            Log::error('Erreur dans DashboardController@filter: ' . $e->getMessage());
-            return view('dashboard', ['error' => 'Erreur lors du filtrage: ' . $e->getMessage()]);
-        }
-    }
-
-    public function filterData(Request $request)
-    {
-        try {
-            $stationId = $request->input('station', 'all');
-            $timeFilter = $request->input('time_filter', 'week');
-            $periodFilter = $request->input('period_filter', 'current');
-
-            // Récupération des données des batteries
-            $batteryData = $this->getAllBatteryBmsData(BatteriesValide::all());
+            // Données pour le graphique des swaps
+            $swapChart = $this->getSwapChartData($timeFilter, $stationId);
             
-            // Statistiques globales
-            $globalStats = $this->getGlobalStats($batteryData);
-            
-            // Statistiques par station
-            $stationStats = $this->getStationBatteryStats($batteryData);
+            \Log::info("=== FIN DEBUG DASHBOARD ===");
 
-            // Sélection des données en fonction de la station choisie
-            if ($stationId !== 'all') {
-                $selectedStationData = $this->getStationData($stationId, $batteryData);
-                $summaryStats = $selectedStationData['summary'];
-                $levelStats = $selectedStationData['levels'];
-            } else {
-                $summaryStats = $globalStats['summary'];
-                $levelStats = $globalStats['levels'];
-            }
-
-            return response()->json([
-                'batterySummary' => $summaryStats,
-                'batteryLevels' => $levelStats,
+            return view('dashboard', [
+                'summaryStats' => $summaryStats,
+                'levelStats' => $levelStats,
                 'stationStats' => $stationStats,
-                'globalStats' => $globalStats,
-                'lastUpdate' => now()->format('Y-m-d H:i:s')
+                'filteredData' => $filteredData,
+                'swapChart' => $swapChart,
+                'stations' => Agence::all(),
+                'selectedStation' => $stationId,
+                'timeFilter' => $timeFilter,
+                'periodFilter' => $periodFilter
             ]);
-        } catch (Exception $e) {
-            Log::error('Erreur dans filterData: ' . $e->getMessage());
-            return response()->json(['error' => 'Erreur lors du filtrage: ' . $e->getMessage()], 500);
-        }
-    }
 
-    public function refreshData(Request $request)
-    {
-        try {
-            $stationId = $request->input('station', 'all');
+        } catch (\Exception $e) {
+            \Log::error('Erreur dashboard: ' . $e->getMessage());
+            \Log::error('Stack trace: ' . $e->getTraceAsString());
             
-            // Récupération des données des batteries
-            $batteryData = $this->getAllBatteryBmsData(BatteriesValide::all());
-            
-            // Statistiques globales
-            $globalStats = $this->getGlobalStats($batteryData);
-            
-            // Statistiques par station
-            $stationStats = $this->getStationBatteryStats($batteryData);
-
-            // Sélection des données en fonction de la station choisie
-            if ($stationId !== 'all') {
-                $selectedStationData = $this->getStationData($stationId, $batteryData);
-                $summaryStats = $selectedStationData['summary'];
-                $levelStats = $selectedStationData['levels'];
-            } else {
-                $summaryStats = $globalStats['summary'];
-                $levelStats = $globalStats['levels'];
-            }
-
-            return response()->json([
-                'batterySummary' => $summaryStats,
-                'batteryLevels' => $levelStats,
-                'stationStats' => $stationStats,
-                'globalStats' => $globalStats,
-                'lastUpdate' => now()->format('H:i:s')
+            return view('dashboard.index', [
+                'error' => 'Une erreur est survenue lors du chargement du dashboard: ' . $e->getMessage(),
+                'summaryStats' => $this->getDefaultStats(),
+                'levelStats' => $this->getDefaultLevelStats(),
+                'stationStats' => [],
+                'filteredData' => null,
+                'swapChart' => $this->getDefaultSwapChart(),
+                'stations' => Agence::all(),
+                'selectedStation' => 'all',
+                'timeFilter' => 'month',
+                'periodFilter' => 'current'
             ]);
-        } catch (Exception $e) {
-            Log::error('Erreur dans refreshData: ' . $e->getMessage());
-            return response()->json(['error' => 'Erreur lors de l\'actualisation: ' . $e->getMessage()], 500);
-        }
-    }
-
-    public function getBatteryDetails($id)
-    {
-        try {
-            $battery = BatteriesValide::findOrFail($id);
-            $bmsData = $this->getLastBMSData($battery->mac_id);
-            $stations = Agence::whereIn('id', BatteryAgence::where('id_battery_valide', $battery->id)->pluck('id_agence'))->pluck('nom_agence')->implode(', ');
-            
-            // Obtenir le statut et le niveau de la batterie
-            $soc = (int)($bmsData['SOC'] ?? 0);
-            $status = $this->getBatteryStatusFromData($bmsData, $soc);
-            
-            // Récupérer l'historique des swaps récents pour cette batterie
-            $swapsHistory = Swap::where('mac_id', $battery->mac_id)
-                ->orderBy('swap_date', 'desc')
-                ->limit(10)
-                ->get()
-                ->map(function($swap) {
-                    $station = Agence::find($swap->id_agence);
-                    return [
-                        'date' => Carbon::parse($swap->swap_date)->format('d/m/Y H:i'),
-                        'station' => $station ? $station->nom_agence : 'Inconnue',
-                        'amount' => $swap->swap_price,
-                        'soc_before' => $swap->soc_before ?? 'N/A',
-                        'soc_after' => $swap->soc_after ?? 'N/A'
-                    ];
-                });
-            
-            // Formatage de la date de dernière communication
-            $lastCommunication = isset($bmsData['BMS_DateTime']) 
-                ? Carbon::createFromTimestamp($bmsData['BMS_DateTime'])->format('d/m/Y H:i:s')
-                : null;
-            
-            return response()->json([
-                'id' => $battery->id,
-                'mac_id' => $battery->mac_id,
-                'serial_number' => $battery->serial_number ?? 'N/A',
-                'stations' => $stations,
-                'status' => $status,
-                'bms_data' => $bmsData,
-                'last_communication' => $lastCommunication,
-                'swaps_history' => count($swapsHistory) > 0 ? $swapsHistory : null
-            ]);
-        } catch (Exception $e) {
-            Log::error('Erreur dans getBatteryDetails: ' . $e->getMessage());
-            return response()->json(['error' => 'Erreur lors de la récupération des détails de la batterie: ' . $e->getMessage()], 500);
-        }
-    }
-
-    public function getInactiveBatteries()
-    {
-        try {
-            // Récupération de toutes les batteries
-            $batteryData = $this->getAllBatteryBmsData(BatteriesValide::all());
-            $inactiveBatteries = [];
-            
-            // Filtrer les batteries inactives
-            foreach ($batteryData as $batteryId => $data) {
-                if ($data['status'] === 'inactive') {
-                    // Récupérer les noms des stations associées
-                    $stationNames = Agence::whereIn('id', $data['station_ids'])
-                        ->pluck('nom_agence')
-                        ->implode(', ');
-                    
-                    // Formatage de la date de dernière communication
-                    $lastCommunication = isset($data['bms_data']['BMS_DateTime']) 
-                        ? Carbon::createFromTimestamp($data['bms_data']['BMS_DateTime'])->format('d/m/Y H:i:s')
-                        : null;
-                    
-                    $inactiveBatteries[] = [
-                        'id' => $batteryId,
-                        'mac_id' => $data['battery']->mac_id,
-                        'serial_number' => $data['battery']->serial_number ?? 'N/A',
-                        'stations' => $stationNames,
-                        'last_communication' => $lastCommunication ?? 'Jamais',
-                        'last_soc' => $data['soc'] . '%'
-                    ];
-                }
-            }
-            
-            return response()->json([
-                'inactiveBatteries' => $inactiveBatteries,
-                'count' => count($inactiveBatteries)
-            ]);
-        } catch (Exception $e) {
-            Log::error('Erreur dans getInactiveBatteries: ' . $e->getMessage());
-            return response()->json(['error' => 'Erreur lors de la récupération des batteries inactives: ' . $e->getMessage()], 500);
-        }
-    }
-
-    public function swapEvolution(Request $request)
-    {
-        try {
-            $station = $request->input('station', 'all');
-            $timeFilter = $request->input('time_filter', 'month');
-            $year = $request->input('year', date('Y'));
-            $month = $request->input('month', date('Y-m'));
-            $start = $request->input('start');
-            $end = $request->input('end');
-
-            // Construction de la requête de base
-            $query = Swap::query();
-            
-            // Filtre par station
-            if ($station !== 'all') {
-                $query->where('id_agence', $station);
-            }
-            
-            // Variables pour stocker les données
-            $labels = [];
-            $swapData = [];
-            $amountData = [];
-            
-            // Traitement selon le type de filtre temporel
-            switch ($timeFilter) {
-                case 'day':
-                    // Filtrer par jours de la semaine en cours
-                    $startOfWeek = Carbon::now()->startOfWeek();
-                    $endOfWeek = Carbon::now()->endOfWeek();
-                    $query->whereBetween('swap_date', [$startOfWeek, $endOfWeek]);
-                    
-                    // Générer les labels pour les jours de la semaine
-                    $labels = ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche'];
-                    
-                    // Regrouper par jour de la semaine (1 = lundi, 7 = dimanche)
-                    $results = $query->selectRaw('DAYOFWEEK(swap_date) as day_num, COUNT(*) as count, SUM(swap_price) as total')
-                        ->groupBy('day_num')
-                        ->get();
-                    
-                    // Initialiser les tableaux avec des zéros
-                    $swapData = array_fill(0, 7, 0);
-                    $amountData = array_fill(0, 7, 0);
-                    
-                    // Remplir les données
-                    foreach ($results as $result) {
-                        // Convertir DAYOFWEEK (1=dimanche, 7=samedi) vers notre format (0=lundi, 6=dimanche)
-                        $index = ($result->day_num + 5) % 7;
-                        $swapData[$index] = (int)$result->count;
-                        $amountData[$index] = (float)$result->total;
-                    }
-                    break;
-                
-                case 'week':
-                    // Extraire l'année et le mois du paramètre
-                    list($yearVal, $monthVal) = explode('-', $month);
-                    
-                    // Calculer le nombre de semaines dans le mois
-                    $startDate = Carbon::createFromDate($yearVal, $monthVal, 1);
-                    $endDate = Carbon::createFromDate($yearVal, $monthVal, 1)->endOfMonth();
-                    
-                    // Filtrer par le mois sélectionné
-                    $query->whereYear('swap_date', $yearVal)
-                        ->whereMonth('swap_date', $monthVal);
-                    
-                    // Générer les labels pour les semaines
-                    $currentDate = clone $startDate;
-                    $weekNumber = 1;
-                    
-                    while ($currentDate <= $endDate) {
-                        $weekStart = clone $currentDate->startOfWeek();
-                        $weekEnd = clone $currentDate->endOfWeek();
-                        
-                        if ($weekStart->month != $monthVal && $weekStart < $startDate) {
-                            $weekStart = clone $startDate;
-                        }
-                        
-                        if ($weekEnd->month != $monthVal && $weekEnd > $endDate) {
-                            $weekEnd = clone $endDate;
-                        }
-                        
-                        $labels[] = "S{$weekNumber} (" . $weekStart->format('d/m') . "-" . $weekEnd->format('d/m') . ")";
-                        
-                        // Passer à la semaine suivante
-                        $currentDate->addWeek();
-                        $weekNumber++;
-                    }
-                    
-                    // Initialiser les tableaux avec des zéros
-                    $swapData = array_fill(0, count($labels), 0);
-                    $amountData = array_fill(0, count($labels), 0);
-                    
-                    // Pour chaque semaine, compter les swaps
-                    for ($i = 0; $i < count($labels); $i++) {
-                        $weekStartDate = clone $startDate;
-                        $weekStartDate->addWeeks($i)->startOfWeek();
-                        
-                        if ($weekStartDate->month != $monthVal && $weekStartDate < $startDate) {
-                            $weekStartDate = clone $startDate;
-                        }
-                        
-                        $weekEndDate = clone $weekStartDate->endOfWeek();
-                        
-                        if ($weekEndDate->month != $monthVal && $weekEndDate > $endDate) {
-                            $weekEndDate = clone $endDate;
-                        }
-                        
-                        $weeklyCount = clone $query;
-                        $weekResults = $weeklyCount->whereBetween('swap_date', [$weekStartDate, $weekEndDate])
-                            ->selectRaw('COUNT(*) as count, SUM(swap_price) as total')
-                            ->first();
-                        
-                        $swapData[$i] = $weekResults ? (int)$weekResults->count : 0;
-                        $amountData[$i] = $weekResults ? (float)$weekResults->total : 0;
-                    }
-                    break;
-                
-                case 'month':
-                    // Filtrer par année
-                    $query->whereYear('swap_date', $year);
-                    
-                    // Générer les labels pour les mois
-                    $labels = ['Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin', 'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'];
-                    
-                    // Regrouper par mois
-                    $results = $query->selectRaw('MONTH(swap_date) as month, COUNT(*) as count, SUM(swap_price) as total')
-                        ->groupBy('month')
-                        ->get();
-                    
-                    // Initialiser les tableaux avec des zéros
-                    $swapData = array_fill(0, 12, 0);
-                    $amountData = array_fill(0, 12, 0);
-                    
-                    // Remplir les données
-                    foreach ($results as $result) {
-                        $index = $result->month - 1; // Les mois commencent à 1
-                        $swapData[$index] = (int)$result->count;
-                        $amountData[$index] = (float)$result->total;
-                    }
-                    break;
-                
-                case 'year':
-                    // Déterminer la plage d'années (5 dernières années jusqu'à l'année en cours)
-                    $startYear = date('Y') - 4;
-                    $endYear = date('Y');
-                    
-                    // Générer les labels pour les années
-                    $labels = range($startYear, $endYear);
-                    
-                    // Filtrer par la plage d'années
-                    $query->whereYear('swap_date', '>=', $startYear)
-                        ->whereYear('swap_date', '<=', $endYear);
-                    
-                    // Regrouper par année
-                    $results = $query->selectRaw('YEAR(swap_date) as year, COUNT(*) as count, SUM(swap_price) as total')
-                        ->groupBy('year')
-                        ->get();
-                    
-                    // Initialiser les tableaux avec des zéros
-                    $swapData = array_fill(0, count($labels), 0);
-                    $amountData = array_fill(0, count($labels), 0);
-                    
-                    // Remplir les données
-                    foreach ($results as $result) {
-                        $index = array_search($result->year, $labels);
-                        if ($index !== false) {
-                            $swapData[$index] = (int)$result->count;
-                            $amountData[$index] = (float)$result->total;
-                        }
-                    }
-                    break;
-                
-                case 'custom':
-                    // Vérifier que les dates sont fournies
-                    if (!$start || !$end) {
-                        return response()->json(['error' => 'Les dates de début et de fin sont requises'], 400);
-                    }
-                    
-                    // Convertir les dates en objets Carbon
-                    $startDate = Carbon::parse($start);
-                    $endDate = Carbon::parse($end);
-                    
-                    // Vérifier que les dates sont valides et que la date de fin est après la date de début
-                    if ($startDate >= $endDate) {
-                        return response()->json(['error' => 'La date de fin doit être après la date de début'], 400);
-                    }
-                    
-                    // Limiter la plage à 31 jours maximum pour éviter les performances lentes
-                    $maxEndDate = (clone $startDate)->addDays(30);
-                    if ($endDate > $maxEndDate) {
-                        $endDate = $maxEndDate;
-                    }
-                    
-                    // Filtrer par la plage de dates
-                    $query->whereBetween('swap_date', [$startDate, $endDate]);
-                    
-                    // Générer les labels pour chaque jour
-                    $currentDate = clone $startDate;
-                    while ($currentDate <= $endDate) {
-                        $labels[] = $currentDate->format('d/m');
-                        $currentDate->addDay();
-                    }
-                    
-                    // Regrouper par jour
-                    $results = $query->selectRaw('DATE(swap_date) as date, COUNT(*) as count, SUM(swap_price) as total')
-                        ->groupBy('date')
-                        ->get();
-                    
-                    // Initialiser les tableaux avec des zéros
-                    $swapData = array_fill(0, count($labels), 0);
-                    $amountData = array_fill(0, count($labels), 0);
-                    
-                    // Remplir les données
-                    foreach ($results as $result) {
-                        $resultDate = Carbon::parse($result->date);
-                        $index = $startDate->diffInDays($resultDate);
-                        if ($index < count($labels)) {
-                            $swapData[$index] = (int)$result->count;
-                            $amountData[$index] = (float)$result->total;
-                        }
-                    }
-                    break;
-                
-                default:
-                    return response()->json(['error' => 'Type de filtre temporel non valide'], 400);
-            }
-            
-            // Préparer la réponse
-            $datasets = [
-                [
-                    'label' => 'Nombre de Swaps',
-                    'backgroundColor' => 'rgba(220, 219, 50, 0.8)',
-                    'borderColor' => 'rgba(220, 219, 50, 1)',
-                    'borderWidth' => 1,
-                    'data' => $swapData,
-                    'yAxisID' => 'y'
-                ],
-                [
-                    'label' => 'Montant (FCFA)',
-                    'backgroundColor' => 'rgba(46, 204, 113, 0.6)',
-                    'borderColor' => 'rgba(46, 204, 113, 1)',
-                    'borderWidth' => 1,
-                    'data' => $amountData,
-                    'yAxisID' => 'y1',
-                    'type' => 'line'
-                ]
-            ];
-            
-            return response()->json([
-                'labels' => $labels,
-                'datasets' => $datasets
-            ]);
-        } catch (Exception $e) {
-            Log::error('Erreur dans swapEvolution: ' . $e->getMessage());
-            return response()->json(['error' => 'Erreur lors de la récupération des données d\'évolution: ' . $e->getMessage()], 500);
         }
     }
 
     /**
-     * Récupère les données BMS pour toutes les batteries
+     * Récupère toutes les données BMS des batteries
      */
     private function getAllBatteryBmsData($batteries)
     {
-        $result = [];
-
-        foreach ($batteries as $battery) {
-            $cacheKey = 'bms_data_' . $battery->mac_id;
-
-            $bmsData = Cache::remember($cacheKey, now()->addMinutes(5), function () use ($battery) {
-                return $this->getLastBMSData($battery->mac_id);
+        return $batteries->map(function ($battery) {
+            // Debug: afficher les informations de base de la batterie
+            \Log::info("Traitement batterie ID: {$battery->id}, MAC: {$battery->mac_id}");
+            
+            $bms = Cache::remember("battery_bms_{$battery->mac_id}", 60, function () use ($battery) {
+                return BMSData::where('mac_id', $battery->mac_id)->latest('timestamp')->first();
             });
 
-            $stationIds = BatteryAgence::where('id_battery_valide', $battery->id)->pluck('id_agence')->toArray();
+            $state = json_decode($bms->state ?? '{}', true);
+            $seting = json_decode($bms->seting ?? '{}', true);
+            $soc = $state['SOC'] ?? 0;
+            $workStatus = $state['WorkStatus'] ?? '3';
+            $status = $this->getBatteryStatus($workStatus);
 
-            $soc = (int)($bmsData['SOC'] ?? 0);
-            $status = $this->getBatteryStatusFromData($bmsData, $soc);
-            $level = $this->getBatteryLevel($soc);
+            // Vérification si la batterie est en ligne
+            $online = false;
+            if (isset($seting['heart_time'])) {
+                try {
+                    $online = Carbon::createFromTimestamp($seting['heart_time'])->diffInMinutes(now()) < 5;
+                } catch (\Exception $e) {
+                    $online = false;
+                }
+            }
 
-            $result[$battery->id] = [
-                'battery' => $battery,
-                'bms_data' => $bmsData ?? [],
-                'status' => $status,
-                'level' => $level,
-                'soc' => $soc,
+            // Récupération des stations - CORRECTION: utiliser l'ID au lieu de id_agence
+            $stationIds = [];
+            $stationNames = [];
+            
+            // Debug: afficher les relations
+            if ($battery->agences) {
+                $agences = $battery->agences;
+                \Log::info("Batterie {$battery->id} - Nombre d'agences: " . $agences->count());
+                
+                // CORRECTION: Utiliser 'id' au lieu de 'id_agence' si id_agence est null
+                $stationIds = $agences->map(function($agence) {
+                    return $agence->id_agence ?: $agence->id; // Utiliser id si id_agence est null
+                })->toArray();
+                
+                $stationNames = $agences->pluck('nom_agence')->toArray();
+                
+                \Log::info("Batterie {$battery->id} - Station IDs: " . json_encode($stationIds));
+                \Log::info("Batterie {$battery->id} - Station Names: " . json_encode($stationNames));
+            } else {
+                \Log::warning("Batterie {$battery->id} - Aucune relation agences trouvée");
+                
+                // Alternative: vérifier s'il y a une colonne station_id directe
+                if (isset($battery->station_id)) {
+                    $stationIds = [$battery->station_id];
+                    $station = Agence::find($battery->station_id);
+                    $stationNames = $station ? [$station->nom_agence] : [];
+                } elseif (isset($battery->id_agence)) {
+                    $stationIds = [$battery->id_agence];
+                    $station = Agence::find($battery->id_agence);
+                    $stationNames = $station ? [$station->nom_agence] : [];
+                }
+            }
+
+            return [
+                'id' => $battery->id,
+                'mac_id' => $battery->mac_id,
                 'station_ids' => $stationIds,
+                'station_names' => $stationNames,
+                'soc' => $soc,
+                'status' => $status,
+                'work_status_code' => $workStatus,
+                'online' => $online,
+                'last_communication' => isset($seting['heart_time']) ? 
+                    Carbon::createFromTimestamp($seting['heart_time'])->format('Y-m-d H:i:s') : null,
+                'bms_data' => $bms
             ];
-        }
-
-        return $result;
+        });
     }
 
     /**
-     * Récupère les dernières données BMS pour une batterie
-     */
-    private function getLastBMSData($mac_id)
-    {
-        $bms = BMSData::where('mac_id', $mac_id)->latest('timestamp')->first();
-        if (!$bms) return [];
-
-        $state = json_decode($bms->state, true) ?? [];
-        $setting = json_decode($bms->seting, true) ?? [];
-        $data = array_merge($state, $setting);
-        $data['BMS_DateTime'] = $data['BMS_DateTime'] ?? strtotime($bms->timestamp);
-
-        return $data;
-    }
-
-    /**
-     * Détermine le statut d'une batterie à partir des données BMS
-     */
-    private function getBatteryStatusFromData($bmsData, $soc)
-    {
-        // Si pas de données BMS ou dernière communication > 10 minutes, considérer comme inactive
-        if (empty($bmsData) || !isset($bmsData['BMS_DateTime']) || (time() - (int)$bmsData['BMS_DateTime'] >= 600)) {
-            return 'inactive';
-        }
-
-        $workStatus = $this->getBatteryStatus($bmsData['WorkStatus'] ?? '');
-
-        // Déterminer le statut selon les critères
-        if ($workStatus === 'Charging') {
-            return 'charging';
-        } elseif ($soc < 30) {
-            return 'discharged';
-        } elseif ($workStatus === 'Idle' && $soc >= 95) {
-            return 'charged';
-        } elseif ($workStatus === 'Idle') {
-            return 'discharged';  // Idle mais pas complètement chargée, considérer comme déchargée
-        } else {
-            return 'unknown';
-        }
-    }
-
-    /**
-     * Convertit le code de statut de travail en libellé
+     * Détermine le statut de la batterie selon le code
      */
     private function getBatteryStatus($code)
     {
-        return match ((string)$code) {
-            '0' => 'Discharging',
-            '1' => 'Charging',
-            '2' => 'Idle',
-            default => 'Unknown',
-        };
+        return [
+            '0' => 'En décharge',
+            '1' => 'En charge',
+            '2' => 'En veille',
+            '3' => 'Défaut'
+        ][$code] ?? 'Inconnu';
     }
 
     /**
-     * Détermine le niveau de charge d'une batterie selon son SOC
+     * Calcule les statistiques générales
      */
-    private function getBatteryLevel($soc)
+    private function getSummaryStats($batteries)
     {
-        return match (true) {
-            $soc > 90 => 'very_high',
-            $soc > 50 => 'high',
-            $soc > 30 => 'medium',
-            $soc >= 0 => 'low',
-            default => 'unknown',
-        };
-    }
-
-    /**
-     * Calcule les statistiques globales pour un ensemble de batteries
-     */
-    private function getGlobalStats($batteryData)
-    {
-        // Initialiser les compteurs
-        $summary = [
-            'charged' => 0,
-            'charging' => 0,
-            'discharged' => 0,
-            'inactive' => 0,
-            'unknown' => 0
-        ];
+        $total = $batteries->count();
+        $inactive = $batteries->where('online', false)->count();
+        $active = $total - $inactive;
         
-        $levels = [
-            'very_high' => 0,
-            'high' => 0,
-            'medium' => 0,
-            'low' => 0,
-            'unknown' => 0
-        ];
-
-        // Compter les batteries par statut et niveau
-        foreach ($batteryData as $data) {
-            $summary[$data['status']]++;
-            $levels[$data['level']]++;
-        }
-
-        // Calculer les totaux
-        $total = count($batteryData);
-        $active = $summary['charged'] + $summary['charging'] + $summary['discharged'];
-
-        // Calculer les pourcentages pour les niveaux
-        $levelsWithPercentage = [];
-        foreach ($levels as $level => $count) {
-            $levelsWithPercentage[$level] = [
-                'count' => $count,
-                'percentage' => $total > 0 ? round(($count / $total) * 100) : 0
-            ];
-        }
+        $charged = $batteries->where('soc', '>=', 95)->count();
+        $charging = $batteries->where('work_status_code', '1')->count();
+        $discharged = $batteries->where('soc', '<', 30)->count();
+        
+        // Batteries pas en charge = actives mais pas en charge
+        $notCharging = $batteries->where('online', true)
+                               ->where('work_status_code', '!=', '1')
+                               ->count();
 
         return [
-            'summary' => array_merge($summary, [
-                'total' => $total,
-                'active_total' => $active
-            ]),
-            'levels' => array_merge($levelsWithPercentage, ['total' => $total])
+            'total' => $total,
+            'active_total' => $active,
+            'inactive' => $inactive,
+            'charged' => $charged,
+            'charging' => $charging,
+            'discharged' => $discharged,
+            'not_charging' => $notCharging
         ];
     }
 
     /**
-     * Récupère les statistiques pour chaque station
+     * Calcule les statistiques par paliers de charge
      */
-    private function getStationBatteryStats($batteryData)
+    private function getLevelStats($batteries)
     {
-        $stationStats = [];
+        $total = $batteries->count();
         
-        // Pour chaque station
-        foreach (Agence::all() as $station) {
-            // Filtrer les batteries pour cette station
-            $stationBatteries = array_filter($batteryData, function($battery) use ($station) {
-                return in_array($station->id, $battery['station_ids']);
-            });
+        $levels = [
+            'very_high' => $batteries->whereBetween('soc', [90, 100]),
+            'high' => $batteries->whereBetween('soc', [70, 89]),
+            'medium' => $batteries->whereBetween('soc', [40, 69]),
+            'low' => $batteries->whereBetween('soc', [10, 39]),
+            'unknown' => $batteries->where('soc', 0)
+        ];
+
+        $levelStats = [];
+        foreach ($levels as $key => $levelBatteries) {
+            $count = $levelBatteries->count();
+            $charging = $levelBatteries->where('work_status_code', '1')->count();
+            $notCharging = $count - $charging;
             
-            // Calculer les statistiques pour cette station
-            $stats = $this->getGlobalStats($stationBatteries);
-            
-            $stationStats[] = [
-                'id' => $station->id,
-                'name' => $station->nom_agence,
-                'stats' => $stats['summary'],
-                'levels' => $stats['levels']
+            $levelStats[$key] = [
+                'count' => $count,
+                'charging' => $charging,
+                'not_charging' => $notCharging,
+                'percentage' => $total > 0 ? round(($count / $total) * 100, 1) : 0
             ];
         }
         
+        $levelStats['total'] = $total;
+        
+        return $levelStats;
+    }
+
+    /**
+     * Calcule les statistiques par station
+     */
+    private function getStationStats($batteries)
+    {
+        $stations = Agence::all();
+        $stationStats = [];
+
+        foreach ($stations as $station) {
+            // CORRECTION: Utiliser 'id' au lieu de 'id_agence' si id_agence est null
+            $stationIdentifier = $station->id_agence ?: $station->id;
+            
+            // Debug: vérifier les IDs des stations
+            \Log::info("Station ID: {$stationIdentifier}, Nom: {$station->nom_agence}");
+            
+            $stationBatteries = $batteries->filter(function ($battery) use ($stationIdentifier) {
+                // Debug: afficher les station_ids de chaque batterie
+                $hasStation = in_array($stationIdentifier, $battery['station_ids']);
+                if ($hasStation) {
+                    \Log::info("Batterie trouvée pour station {$stationIdentifier}: " . json_encode($battery['station_ids']));
+                }
+                return $hasStation;
+            });
+
+            // Debug: compter les batteries trouvées
+            $batteryCount = $stationBatteries->count();
+            \Log::info("Station {$station->nom_agence}: {$batteryCount} batteries trouvées");
+
+            $total = $batteryCount;
+            $charged = $stationBatteries->where('soc', '>=', 95)->count();
+            $charging = $stationBatteries->where('work_status_code', '1')->count();
+            $discharged = $stationBatteries->where('soc', '<', 30)->count();
+            $inactive = $stationBatteries->where('online', false)->count();
+
+            // Paliers par station avec debug
+            $paliers = [
+                '90-100' => $stationBatteries->filter(function($b) { return $b['soc'] >= 90 && $b['soc'] <= 100; })->count(),
+                '70-90' => $stationBatteries->filter(function($b) { return $b['soc'] >= 70 && $b['soc'] < 90; })->count(),
+                '40-70' => $stationBatteries->filter(function($b) { return $b['soc'] >= 40 && $b['soc'] < 70; })->count(),
+                '10-40' => $stationBatteries->filter(function($b) { return $b['soc'] >= 10 && $b['soc'] < 40; })->count()
+            ];
+
+            \Log::info("Station {$station->nom_agence} - Paliers: " . json_encode($paliers));
+
+            $stationStats[] = [
+                'id' => $stationIdentifier,
+                'name' => $station->nom_agence,
+                'stats' => [
+                    'total' => $total,
+                    'charged' => $charged,
+                    'charging' => $charging,
+                    'discharged' => $discharged,
+                    'inactive' => $inactive,
+                    'active' => $total - $inactive
+                ],
+                'paliers' => $paliers
+            ];
+        }
+
         return $stationStats;
     }
 
     /**
-     * Récupère les données pour une station spécifique
+     * Récupère les données filtrées selon la station
      */
-    private function getStationData($stationId, $batteryData)
+    private function getFilteredData($batteries, $stationId)
     {
-        // Filtrer les batteries pour la station demandée
-        $stationBatteries = array_filter($batteryData, function($battery) use ($stationId) {
+        if ($stationId === 'all') {
+            return null; // Utiliser les données globales
+        }
+
+        $station = Agence::find($stationId);
+        if (!$station) {
+            return null;
+        }
+
+        $filteredBatteries = $batteries->filter(function ($battery) use ($stationId) {
             return in_array($stationId, $battery['station_ids']);
         });
-        
-        // Calculer les statistiques pour la station
-        return $this->getGlobalStats($stationBatteries);
-    }
-    
-    /**
-     * Génère les données de test pour le graphique d'évolution des swaps
-     * Cette méthode est temporaire et peut être utilisée pour des tests
-     */
-    private function getStaticSwapData($timeFilter, $stationId = 'all')
-    {
-        $labels = match ($timeFilter) {
-            'day' => ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche'],
-            'week' => ['Semaine 1', 'Semaine 2', 'Semaine 3', 'Semaine 4'],
-            'month' => ['Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin', 'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'],
-            'year' => ['2020', '2021', '2022', '2023', '2024', '2025'],
-            default => []
-        };
 
-        $datasets = [
-            [
-                'label' => 'Nombre de Swaps',
-                'data' => array_fill(0, count($labels), rand(10, 100)),
-                'backgroundColor' => 'rgba(220, 219, 50, 0.8)',
-                'borderColor' => 'rgba(220, 219, 50, 1)',
-                'borderWidth' => 1,
-                'yAxisID' => 'y'
-            ],
-            [
-                'label' => 'Montant (FCFA)',
-                'data' => array_fill(0, count($labels), rand(5000, 50000)),
-                'backgroundColor' => 'rgba(46, 204, 113, 0.6)',
-                'borderColor' => 'rgba(46, 204, 113, 1)',
-                'borderWidth' => 1,
-                'yAxisID' => 'y1',
-                'type' => 'line'
-            ]
+        return [
+            'station_name' => $station->nom_agence,
+            'summary_stats' => $this->getSummaryStats($filteredBatteries),
+            'level_stats' => $this->getLevelStats($filteredBatteries)
         ];
+    }
 
-        if ($stationId === 'all') {
-            $colors = ['#2ecc71', '#3498db', '#f39c12', '#e74c3c', '#9b59b6', '#1abc9c'];
+    /**
+     * Récupère les données pour le graphique des swaps
+     */
+    private function getSwapChartData($timeFilter, $stationId = 'all')
+    {
+        try {
+            $query = Swap::query();
             
-            // Ajouter des données supplémentaires par station pour les tests
-            /*
-            foreach (Agence::all() as $index => $station) {
-                $datasets[] = [
-                    'label' => $station->nom_agence,
-                    'data' => array_fill(0, count($labels), rand(5, 50)),
-                    'backgroundColor' => $colors[$index % count($colors)],
-                    'borderColor' => $colors[$index % count($colors)],
-                ];
+            // Filtrer par station si nécessaire
+            if ($stationId !== 'all') {
+                $query->where('station_id', $stationId);
             }
-            */
+
+            // Définir la période selon le filtre
+            $startDate = match ($timeFilter) {
+                'day' => now()->startOfWeek(),
+                'week' => now()->startOfMonth(),
+                'month' => now()->startOfYear(),
+                'year' => now()->subYears(5)->startOfYear(),
+                default => now()->startOfYear()
+            };
+
+            $swaps = $query->where('created_at', '>=', $startDate)
+                          ->orderBy('created_at')
+                          ->get();
+
+            return $this->formatSwapChartData($swaps, $timeFilter);
+
+        } catch (\Exception $e) {
+            \Log::error('Erreur graphique swaps: ' . $e->getMessage());
+            return $this->getStaticSwapData($timeFilter, $stationId);
+        }
+    }
+
+    /**
+     * Formate les données du graphique des swaps
+     */
+    private function formatSwapChartData($swaps, $timeFilter)
+    {
+        $labels = $this->getChartLabels($timeFilter);
+        $swapCounts = array_fill(0, count($labels), 0);
+        $amounts = array_fill(0, count($labels), 0);
+
+        foreach ($swaps as $swap) {
+            $index = $this->getSwapIndex($swap->created_at, $timeFilter);
+            if ($index !== null && $index < count($labels)) {
+                $swapCounts[$index]++;
+                $amounts[$index] += $swap->amount ?? 0;
+            }
         }
 
         return [
             'labels' => $labels,
-            'datasets' => $datasets,
-            'timeUnitLabel' => $this->getTimeUnitLabel($timeFilter),
+            'swaps' => $swapCounts,
+            'amounts' => $amounts,
+            'timeUnitLabel' => $this->getTimeUnitLabel($timeFilter)
         ];
     }
 
     /**
-     * Renvoie le libellé de l'unité de temps en fonction du filtre choisi
+     * Génère les labels pour le graphique selon le filtre
+     */
+    private function getChartLabels($timeFilter)
+    {
+        return match ($timeFilter) {
+            'day' => ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche'],
+            'week' => ['Semaine 1', 'Semaine 2', 'Semaine 3', 'Semaine 4'],
+            'month' => ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Jun', 'Jul', 'Aoû', 'Sep', 'Oct', 'Nov', 'Déc'],
+            'year' => ['2020', '2021', '2022', '2023', '2024', '2025'],
+            default => []
+        };
+    }
+
+    /**
+     * Détermine l'index d'un swap dans le graphique
+     */
+    private function getSwapIndex($date, $timeFilter)
+    {
+        $carbonDate = Carbon::parse($date);
+        
+        return match ($timeFilter) {
+            'day' => $carbonDate->dayOfWeek - 1,
+            'week' => ceil($carbonDate->day / 7) - 1,
+            'month' => $carbonDate->month - 1,
+            'year' => $carbonDate->year - 2020,
+            default => null
+        };
+    }
+
+    /**
+     * API endpoint pour les données des batteries inactives
+     */
+    public function getInactiveBatteries(Request $request)
+    {
+        try {
+            $stationId = $request->get('station', 'all');
+            $batteries = $this->getAllBatteryBmsData(BatteriesValide::all());
+            
+            $inactiveBatteries = $batteries->filter(function ($battery) use ($stationId) {
+                $matchesStation = $stationId === 'all' || in_array($stationId, $battery['station_ids']);
+                return !$battery['online'] && $matchesStation;
+            });
+
+            $result = $inactiveBatteries->map(function ($battery) {
+                return [
+                    'id' => $battery['id'],
+                    'mac_id' => $battery['mac_id'],
+                    'stations' => implode(', ', $battery['station_names']),
+                    'last_communication' => $battery['last_communication'],
+                    'last_soc' => $battery['soc'],
+                    'status' => $battery['status']
+                ];
+            })->values();
+
+            return response()->json([
+                'success' => true,
+                'count' => $result->count(),
+                'data' => $result
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Erreur lors de la récupération des batteries inactives'
+            ], 500);
+        }
+    }
+
+    /**
+     * Données par défaut en cas d'erreur
+     */
+    private function getDefaultStats()
+    {
+        return [
+            'total' => 0,
+            'active_total' => 0,
+            'inactive' => 0,
+            'charged' => 0,
+            'charging' => 0,
+            'discharged' => 0,
+            'not_charging' => 0
+        ];
+    }
+
+    private function getDefaultLevelStats()
+    {
+        return [
+            'very_high' => ['count' => 0, 'charging' => 0, 'not_charging' => 0, 'percentage' => 0],
+            'high' => ['count' => 0, 'charging' => 0, 'not_charging' => 0, 'percentage' => 0],
+            'medium' => ['count' => 0, 'charging' => 0, 'not_charging' => 0, 'percentage' => 0],
+            'low' => ['count' => 0, 'charging' => 0, 'not_charging' => 0, 'percentage' => 0],
+            'unknown' => ['count' => 0, 'charging' => 0, 'not_charging' => 0, 'percentage' => 0],
+            'total' => 0
+        ];
+    }
+
+    private function getDefaultSwapChart()
+    {
+        return [
+            'labels' => [],
+            'swaps' => [],
+            'amounts' => [],
+            'timeUnitLabel' => 'Aucune donnée'
+        ];
+    }
+
+    /**
+     * Génère les données de test pour le graphique d'évolution des swaps
+     */
+    private function getStaticSwapData($timeFilter, $stationId = 'all')
+    {
+        $labels = $this->getChartLabels($timeFilter);
+        
+        return [
+            'labels' => $labels,
+            'swaps' => array_fill(0, count($labels), rand(10, 100)),
+            'amounts' => array_fill(0, count($labels), rand(5000, 50000)),
+            'timeUnitLabel' => $this->getTimeUnitLabel($timeFilter)
+        ];
+    }
+
+    /**
+     * Renvoie le libellé de l'unité de temps
      */
     private function getTimeUnitLabel($filter)
     {
@@ -778,5 +514,21 @@ class DashboardController extends Controller
             'custom' => 'Période personnalisée',
             default => 'Période',
         };
+    }
+
+    /**
+     * Route pour le filtrage AJAX
+     */
+    public function filter(Request $request)
+    {
+        $stationId = $request->get('station', 'all');
+        $timeFilter = $request->get('time_filter', 'month');
+        $periodFilter = $request->get('period_filter', 'current');
+
+        return redirect()->route('dashboard.index', [
+            'station' => $stationId,
+            'time_filter' => $timeFilter,
+            'period_filter' => $periodFilter
+        ]);
     }
 }

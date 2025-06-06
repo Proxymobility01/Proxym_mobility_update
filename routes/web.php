@@ -18,6 +18,7 @@ use App\Http\Controllers\Associations\RavitaillementController;
 use App\Http\Controllers\BmsSetupController;
 use App\Http\Controllers\Gps\LocalisationController;
 use App\Http\Controllers\Gps\LeaseController;
+use App\Http\Controllers\Batteries\BatteryStationController;
 
 Route::get('/', function () {
     return view('welcome');
@@ -26,14 +27,11 @@ Route::get('/', function () {
 //Route::get('/', [DashboardController::class, 'index'])->middleware(['auth', 'verified'])->name('dashboard');
 
 // Routes du Dashboard
+
+// Dans routes/web.php
 Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard.index');
 Route::get('/dashboard/filter', [DashboardController::class, 'filter'])->name('dashboard.filter');
-Route::get('/dashboard/refresh', [DashboardController::class, 'refreshData'])->name('dashboard.refresh');
-Route::get('/dashboard/swap-evolution', [DashboardController::class, 'swapEvolution'])->name('dashboard.swap_evolution');
-Route::get('/api/inactive_batteries', [DashboardController::class, 'getInactiveBatteries'])->name('api.inactive_batteries');
-Route::get('/api/batteries/{id}', [DashboardController::class, 'getBatteryDetails']);
-
-
+Route::get('/dashboard/inactive-batteries', [DashboardController::class, 'getInactiveBatteries'])->name('dashboard.inactive-batteries');
 
 
 Route::get('/recalculer-distances', [\App\Http\Controllers\DailyDistanceController::class, 'recalculerDistanceParPlage'])
@@ -208,6 +206,9 @@ Route::post('/api/leases/stats', [App\Http\Controllers\Leases\LeaseController::c
 
 
 
+
+
+Route::get('/batteries/station', [BatteryStationController::class, 'index'])->name('batteries.station.index');
 
 
 });

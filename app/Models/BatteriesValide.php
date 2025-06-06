@@ -70,5 +70,11 @@ public function batteryMotoUserAssociations()
 }
 
 
+public function agences()
+{
+    return $this->hasMany(BatteryAgence::class, 'id_battery_valide', 'id');
+}
+
+
 
 }

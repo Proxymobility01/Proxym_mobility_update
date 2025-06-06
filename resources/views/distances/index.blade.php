@@ -358,15 +358,6 @@ tr:hover {
                 <input type="date" id="end-date" value="{{ now()->toDateString() }}">
             </div>
             
-<<<<<<< HEAD
-            <select id="distance-filter">
-                <option value="all">Toutes les distances</option>
-                <option value="0-10">0-10 KM</option>
-                <option value="10-50">10-50 KM</option>
-                <option value="50-100">50-100 KM</option>
-                <option value="100+">100+ KM</option>
-            </select>
-=======
             <form method="GET" action="{{ route('recalculer.distances') }}">
     <button type="submit" class="btn btn-primary">
         🔄 Recalculer les distances sur une plage
@@ -374,7 +365,6 @@ tr:hover {
 </form>
 
 
->>>>>>> bdcca81 (version stable avec authentifiacation et ravitaillement et gestion efficasse des stations)
             
             <button id="show-time-filter" class="export-btn" style="background-color: var(--tertiary); color: var(--secondary); padding: 6px 12px; margin-left: 10px;">
                 <i class="fas fa-clock mr-2"></i> Filtre horaire
