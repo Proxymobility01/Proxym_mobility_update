@@ -382,6 +382,16 @@ tr:hover {
 <meta name="csrf-token" content="{{ csrf_token() }}">
 
 <div class="main-content">
+
+<div class="nav-tabs">
+    <div class="nav-tab {{ request()->is('swaps') ? 'active' : '' }}" data-url="{{ route('swaps.index') }}">
+        Gestion des Swaps
+    </div>
+    <div class="nav-tab {{ request()->is('swaps-chauffeur*') ? 'active' : '' }}" data-url="{{ route('swaps.chauffeur.index') }}">
+        Nombre de Swaps par Chauffeur    
+    </div>
+   
+</div>
     <!-- En-tête -->
     <div class="content-header">
         <h2>{{ $pageTitle }}</h2>
@@ -1392,5 +1402,16 @@ document.addEventListener('DOMContentLoaded', function() {
     // Par défaut, filtrer pour afficher tous les swaps
     filterSwaps();
 });
+
+
+ // Navigation par onglets
+    document.querySelectorAll('.nav-tab').forEach(tab => {
+        tab.addEventListener('click', function() {
+            const url = this.getAttribute('data-url');
+            if (url) {
+                window.location.href = url;
+            }
+        });
+    });
 </script>
 @endsection

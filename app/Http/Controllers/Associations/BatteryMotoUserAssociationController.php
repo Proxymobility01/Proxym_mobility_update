@@ -139,7 +139,7 @@ public function getAvailableBatteries()
         Log::info('Récupération des batteries disponibles non associées');
         
         // Récupérer les IDs des batteries déjà associées
-        $associatedBatteryIds = BatteryMotoUserAssociation::pluck('battery_id')->toArray();
+       $associatedBatteryIds = BatteryMotoUserAssociation::whereNotNull('battery_id')->pluck('battery_id')->toArray();
         
         // Récupérer toutes les batteries qui ne sont pas dans la liste des batteries associées
         $batteries = BatteriesValide::whereNotIn('id', $associatedBatteryIds)
@@ -147,15 +147,16 @@ public function getAvailableBatteries()
             ->get();
         
         // Si on est en mode édition, on doit aussi inclure la batterie actuellement associée
-        if (request()->has('include_battery_id')) {
-            $includeBatteryId = request()->input('include_battery_id');
-            $currentBattery = BatteriesValide::find($includeBatteryId);
-            
-            if ($currentBattery) {
-                // Ajouter la batterie actuelle à la collection
-                $batteries->push($currentBattery);
-            }
-        }
+       $includeBatteryId = request()->input('include_battery_id');
+
+if (!empty($includeBatteryId)) {
+    $currentBattery = BatteriesValide::find($includeBatteryId);
+
+    if ($currentBattery) {
+        $batteries->push($currentBattery);
+    }
+}
+
         
         // Récupérer tous les mac_ids en une seule fois
         $macIds = $batteries->pluck('mac_id')->filter()->unique();
@@ -761,4 +762,22 @@ public function update(Request $request, $id)
             'data' => $data
         ], $code);
     }
+
+
+// methode pour desassocier une batterie à une moto
+    public function desassociate($id)
+{
+    try {
+        $association = BatteryMotoUserAssociation::findOrFail($id);
+        $association->battery_id = null;
+        $association->save();
+
+        return redirect()->back()->with('success', 'La batterie a été désassociée avec succès.');
+    } catch (\Exception $e) {
+        Log::error("Erreur lors de la désassociation : " . $e->getMessage());
+
+        return redirect()->back()->with('error', 'Erreur lors de la désassociation : ' . $e->getMessage());
+    }
+}
+
 }

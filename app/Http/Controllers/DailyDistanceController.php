@@ -655,26 +655,27 @@ class DailyDistanceController extends Controller
 
 
 
-    public function recalculerDistanceParPlage()
+   public function recalculerDistanceParPlage()
 {
-    // 🔐 Définir manuellement la plage de dates (exemple du 1er au 7 mai 2025)
-    $startDate = Carbon::createFromFormat('Y-m-d', '2025-05-01')->startOfDay();
-    $endDate = Carbon::createFromFormat('Y-m-d', '2025-05-23')->endOfDay();
+    // 🗓️ Définir manuellement la plage de dates ici (modifiable)
+    $startDate = Carbon::createFromFormat('Y-m-d', '2025-01-01')->startOfDay();
+    $endDate = Carbon::createFromFormat('Y-m-d', '2025-06-23')->endOfDay();
 
-    Log::info("Début du recalcul des distances du {$startDate} au {$endDate}");
+    Log::info("🔁 Début du recalcul des distances du {$startDate} au {$endDate}");
 
     $currentDate = $startDate->copy();
     $resultats = [];
 
     while ($currentDate->lte($endDate)) {
         $dateStr = $currentDate->toDateString();
-        Log::info("🔄 Traitement de la date : {$dateStr}");
+        Log::info("📆 Traitement de la date : {$dateStr}");
 
-        // Récupération des associations chauffeur - moto
+        // Récupération des associations chauffeur-moto pour ce jour
         $associations = AssociationUserMoto::with(['validatedUser', 'motosValide'])->get();
 
         foreach ($associations as $association) {
             if (!$association->validatedUser || !$association->motosValide || !$association->motosValide->gps_imei) {
+                Log::warning("🚫 Association incomplète ignorée pour la date {$dateStr}");
                 continue;
             }
 
@@ -692,6 +693,14 @@ class DailyDistanceController extends Controller
                 ->get();
 
             if ($gpsPoints->count() < 2) {
+                Log::info("ℹ️ Pas assez de points GPS pour {$user->prenom} {$user->nom} (ID {$user->id}) le {$dateStr}");
+                $resultats[] = [
+                    'date' => $dateStr,
+                    'chauffeur' => "{$user->prenom} {$user->nom}",
+                    'user_id' => $user->id,
+                    'distance_km' => 0,
+                    'message' => 'Pas assez de points GPS pour calculer la distance'
+                ];
                 continue;
             }
 
@@ -720,7 +729,7 @@ class DailyDistanceController extends Controller
 
             $totalDistance = round($totalDistance, 2);
 
-            // 🔁 Créer ou mettre à jour l'enregistrement
+            // Mise à jour ou création du DailyDistance
             DailyDistance::updateOrCreate(
                 [
                     'user_id' => $user->id,
@@ -733,24 +742,28 @@ class DailyDistanceController extends Controller
                 ]
             );
 
+            Log::info("✅ Calcul terminé pour {$user->prenom} {$user->nom} (ID {$user->id}) : {$totalDistance} KM");
+
             $resultats[] = [
                 'date' => $dateStr,
                 'chauffeur' => "{$user->prenom} {$user->nom}",
                 'user_id' => $user->id,
-                'distance_km' => $totalDistance
+                'distance_km' => $totalDistance,
+                'message' => 'Distance mise à jour avec succès'
             ];
         }
 
         $currentDate->addDay();
     }
 
-    Log::info("✅ Recalcul terminé");
+    Log::info("🏁 Recalcul terminé pour la plage");
 
     return response()->json([
         'success' => true,
-        'message' => 'Recalcul effectué avec succès.',
+        'message' => 'Recalcul effectué avec succès pour la plage définie.',
         'résultats' => $resultats
     ]);
 }
+
 
 }

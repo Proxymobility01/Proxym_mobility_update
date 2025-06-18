@@ -123,6 +123,19 @@
 
 @section('content')
 <div class="main-content">
+
+
+    <!-- Onglets de navigation -->
+<div class="nav-tabs">
+    <div class="nav-tab {{ request()->is('batteries') ? 'active' : '' }}" data-url="{{ route('batteries.index') }}">
+        Batteries Validées
+    </div>
+    <div class="nav-tab {{ request()->is('batteries/station*') ? 'active' : '' }}" data-url="{{ route('batteries.station.index') }}">
+        Gestion Batteries Stations
+    </div>
+   
+</div>
+
     <!-- En-tête -->
     <div class="content-header">
         <h2>Gestion des Batteries</h2>
@@ -706,6 +719,18 @@ document.addEventListener('DOMContentLoaded', function() {
     // Chargement initial
     loadBatteries();
 });
+
+
+
+  // Navigation par onglets
+    document.querySelectorAll('.nav-tab').forEach(tab => {
+        tab.addEventListener('click', function() {
+            const url = this.getAttribute('data-url');
+            if (url) {
+                window.location.href = url;
+            }
+        });
+    });
 </script>
 
 

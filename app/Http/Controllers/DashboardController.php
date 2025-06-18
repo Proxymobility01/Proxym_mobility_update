@@ -47,6 +47,7 @@ class DashboardController extends Controller
             $swapChart = $this->getSwapChartData($timeFilter, $stationId);
             
             \Log::info("=== FIN DEBUG DASHBOARD ===");
+             
 
             return view('dashboard', [
                 'summaryStats' => $summaryStats,
@@ -323,61 +324,107 @@ class DashboardController extends Controller
     /**
      * Récupère les données pour le graphique des swaps
      */
-    private function getSwapChartData($timeFilter, $stationId = 'all')
-    {
-        try {
-            $query = Swap::query();
-            
-            // Filtrer par station si nécessaire
-            if ($stationId !== 'all') {
-                $query->where('station_id', $stationId);
-            }
+  private function getSwapChartData($timeFilter = 'month', $stationId = 'all')
+{
+    $query = Swap::query();
 
-            // Définir la période selon le filtre
-            $startDate = match ($timeFilter) {
-                'day' => now()->startOfWeek(),
-                'week' => now()->startOfMonth(),
-                'month' => now()->startOfYear(),
-                'year' => now()->subYears(5)->startOfYear(),
-                default => now()->startOfYear()
-            };
-
-            $swaps = $query->where('created_at', '>=', $startDate)
-                          ->orderBy('created_at')
-                          ->get();
-
-            return $this->formatSwapChartData($swaps, $timeFilter);
-
-        } catch (\Exception $e) {
-            \Log::error('Erreur graphique swaps: ' . $e->getMessage());
-            return $this->getStaticSwapData($timeFilter, $stationId);
-        }
+    if ($stationId !== 'all') {
+        $query->where('station_id', $stationId);
     }
+
+    $startDate = match ($timeFilter) {
+        'day' => now()->startOfWeek(),
+        'week' => now()->startOfMonth(),
+        'month' => now()->startOfYear(),
+        'year' => now()->subYears(5)->startOfYear(),
+        default => now()->startOfYear(),
+    };
+
+    $swaps = $query->where('created_at', '>=', $startDate)->get();
+
+    $grouped = match ($timeFilter) {
+        'day' => $swaps->groupBy(fn($swap) => \Carbon\Carbon::parse($swap->created_at)->locale('fr')->isoFormat('dddd')), // Lundi, etc.
+        'week' => $swaps->groupBy(fn($swap) => 'Semaine ' . \Carbon\Carbon::parse($swap->created_at)->weekOfMonth),
+        'month' => $swaps->groupBy(fn($swap) => \Carbon\Carbon::parse($swap->created_at)->locale('fr')->isoFormat('MMMM')),
+        'year' => $swaps->groupBy(fn($swap) => \Carbon\Carbon::parse($swap->created_at)->format('Y')),
+        default => collect(),
+    };
+
+    $labels = $grouped->keys()->toArray();
+
+    $swapCounts = [];
+    $amounts = [];
+
+    foreach ($labels as $label) {
+        $group = $grouped[$label];
+        $swapCounts[] = $group->count();
+        $amounts[] = $group->sum('montant');
+    }
+
+    return [
+        'labels' => $labels,
+        'swaps' => $swapCounts,
+        'amounts' => $amounts,
+        'timeUnitLabel' => match ($timeFilter) {
+            'day' => 'Jours de la semaine',
+            'week' => 'Semaines du mois',
+            'month' => 'Mois de l’année',
+            'year' => 'Années',
+            default => 'Période',
+        },
+    ];
+}
+
 
     /**
      * Formate les données du graphique des swaps
      */
-    private function formatSwapChartData($swaps, $timeFilter)
-    {
-        $labels = $this->getChartLabels($timeFilter);
-        $swapCounts = array_fill(0, count($labels), 0);
-        $amounts = array_fill(0, count($labels), 0);
+   private function formatSwapChartData($swaps, $timeFilter)
+{
+    $grouped = match ($timeFilter) {
+        'day' => $swaps->groupBy(fn($swap) => Carbon::parse($swap->created_at)->format('l')), // Lundi, Mardi...
+        'week' => $swaps->groupBy(fn($swap) => 'Semaine ' . Carbon::parse($swap->created_at)->weekOfMonth),
+        'month' => $swaps->groupBy(fn($swap) => Carbon::parse($swap->created_at)->format('F')), // Janvier...
+        'year' => $swaps->groupBy(fn($swap) => Carbon::parse($swap->created_at)->format('Y')),
+        default => collect(),
+    };
 
-        foreach ($swaps as $swap) {
-            $index = $this->getSwapIndex($swap->created_at, $timeFilter);
-            if ($index !== null && $index < count($labels)) {
-                $swapCounts[$index]++;
-                $amounts[$index] += $swap->amount ?? 0;
-            }
-        }
+    $labels = $grouped->keys()->toArray();
 
-        return [
-            'labels' => $labels,
-            'swaps' => $swapCounts,
-            'amounts' => $amounts,
-            'timeUnitLabel' => $this->getTimeUnitLabel($timeFilter)
-        ];
+    $swapCounts = [];
+    $totalAmounts = [];
+
+    foreach ($labels as $label) {
+        $swapsGroup = $grouped[$label];
+        $swapCounts[] = $swapsGroup->count();
+        $totalAmounts[] = $swapsGroup->sum('montant');
     }
+
+    return [
+        'labels' => $labels,
+        'datasets' => [
+            [
+                'label' => 'Nombre de Swaps',
+                'data' => $swapCounts,
+                'backgroundColor' => 'rgba(220, 219, 50, 0.8)',
+                'borderColor' => 'rgba(220, 219, 50, 1)',
+                'borderWidth' => 1,
+                'yAxisID' => 'y'
+            ],
+            [
+                'label' => 'Montant (FCFA)',
+                'data' => $totalAmounts,
+                'backgroundColor' => 'rgba(46, 204, 113, 0.6)',
+                'borderColor' => 'rgba(46, 204, 113, 1)',
+                'borderWidth' => 1,
+                'type' => 'line',
+                'yAxisID' => 'y1'
+            ]
+        ],
+        'timeUnitLabel' => $this->getTimeUnitLabel($timeFilter)
+    ];
+}
+
 
     /**
      * Génère les labels pour le graphique selon le filtre
@@ -504,17 +551,17 @@ class DashboardController extends Controller
     /**
      * Renvoie le libellé de l'unité de temps
      */
-    private function getTimeUnitLabel($filter)
-    {
-        return match ($filter) {
-            'day' => 'Jours de la semaine',
-            'week' => 'Semaines du mois en cours',
-            'month' => 'Mois de l\'année',
-            'year' => 'Années',
-            'custom' => 'Période personnalisée',
-            default => 'Période',
-        };
-    }
+  private function getTimeUnitLabel($filter)
+{
+    return match ($filter) {
+        'day' => 'Jours de la semaine',
+        'week' => 'Semaines du mois en cours',
+        'month' => 'Mois de l\'année',
+        'year' => 'Années',
+        default => 'Période',
+    };
+}
+
 
     /**
      * Route pour le filtrage AJAX

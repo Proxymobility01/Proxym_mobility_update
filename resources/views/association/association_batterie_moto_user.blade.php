@@ -1065,11 +1065,21 @@ function openEditAssociationModal(row) {
             selectedMotoId = data.moto_unique_id;
             selectedBatteryId = data.battery_unique_id;
             
+
+            
             // Charger les motos disponibles
+            console.log("Battery ID reçu:", data.battery_id);
             loadAvailableMotos();
             
             // Charger les batteries disponibles, y compris la batterie actuellement associée
-            loadAvailableBatteries(data.battery_id);
+           // Corrigé
+if (data.battery_id) {
+    loadAvailableBatteries(data.battery_id);
+} else {
+    loadAvailableBatteries(); // sans paramètre
+}
+
+
             
             associationModal.classList.add('active');
             document.body.style.overflow = 'hidden';

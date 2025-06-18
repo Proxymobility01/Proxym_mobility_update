@@ -19,10 +19,18 @@ use App\Http\Controllers\BmsSetupController;
 use App\Http\Controllers\Gps\LocalisationController;
 use App\Http\Controllers\Gps\LeaseController;
 use App\Http\Controllers\Batteries\BatteryStationController;
+use App\Http\Controllers\Compteur\CompteurController;
+use App\Http\Controllers\DailyDistanceController;
 
 Route::get('/', function () {
     return view('welcome');
 });
+
+
+
+
+Route::get('/compteur/test', [CompteurController::class, 'index'])->name('compteur.index');
+Route::post('/compteur/envoyer', [CompteurController::class, 'envoyerMessage'])->name('compteur.envoyer');
 
 //Route::get('/', [DashboardController::class, 'index'])->middleware(['auth', 'verified'])->name('dashboard');
 
@@ -34,10 +42,10 @@ Route::get('/dashboard/filter', [DashboardController::class, 'filter'])->name('d
 Route::get('/dashboard/inactive-batteries', [DashboardController::class, 'getInactiveBatteries'])->name('dashboard.inactive-batteries');
 
 
-Route::get('/recalculer-distances', [\App\Http\Controllers\DailyDistanceController::class, 'recalculerDistanceParPlage'])
-    ->name('recalculer.distances');
 
 
+Route::get('/recalculer-distances', [DailyDistanceController::class, 'recalculerDistanceParPlage'])
+    ->name('distances.recalculer');
 
 // Routes API pour les batteries
 Route::prefix('api')->group(function () {
@@ -209,7 +217,9 @@ Route::post('/api/leases/stats', [App\Http\Controllers\Leases\LeaseController::c
 
 
 Route::get('/batteries/station', [BatteryStationController::class, 'index'])->name('batteries.station.index');
-
+// Dans web.php
+Route::get('/batteries/station/export', [BatteryStationController::class, 'export'])->name('batteries.station.export');
+Route::get('/batteries/station/stats', [BatteryStationController::class, 'getStats'])->name('batteries.station.stats');
 
 });
 

@@ -358,11 +358,10 @@ tr:hover {
                 <input type="date" id="end-date" value="{{ now()->toDateString() }}">
             </div>
             
-            <form method="GET" action="{{ route('recalculer.distances') }}">
-    <button type="submit" class="btn btn-primary">
-        🔄 Recalculer les distances sur une plage
-    </button>
-</form>
+   
+<a href="{{ route('distances.recalculer') }}" class="btn btn-warning" onclick="return confirm('⚠️ Êtes-vous sûr de vouloir recalculer les distances sur la plage définie ?')">
+    🔁 Recalculer les distances (1er → 23 mai)
+</a>
 
 
             
