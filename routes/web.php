@@ -21,12 +21,15 @@ use App\Http\Controllers\Gps\LeaseController;
 use App\Http\Controllers\Batteries\BatteryStationController;
 use App\Http\Controllers\Compteur\CompteurController;
 use App\Http\Controllers\DailyDistanceController;
+use App\Http\Controllers\Dashboard\DisplayDashboardController;
 
 Route::get('/', function () {
     return view('welcome');
 });
 
 
+Route::get('/dashboard/display', [DisplayDashboardController::class, 'index'])->name('display.index');
+Route::get('/dashboard/full-data', [DisplayDashboardController::class, 'getFullDashboardData']);
 
 
 Route::get('/compteur/test', [CompteurController::class, 'index'])->name('compteur.index');

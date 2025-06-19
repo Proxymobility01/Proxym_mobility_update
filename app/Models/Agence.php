@@ -20,6 +20,9 @@ class Agence extends Model
         'description',
         'logo',
         'password',
+        'longitude',
+        'latitude',
+
     ];
 
      // Relation avec les utilisateurs de l'agence
