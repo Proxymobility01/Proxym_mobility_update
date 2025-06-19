@@ -198,53 +198,56 @@
 
     <div class="redmi-watermark">Flotte Batteries, Motos, Stations</div>
 <script>
+    // Variables globales pour les données initiales
+    const initialStationsMap = @json($stationsMap ?? []);
+    const initialBatteriesWithLocation = @json($batteriesWithLocation ?? []);
+    const initialMotosWithLocation = @json($motosWithLocation ?? []);
+
+    let lastSnapshot = null;
+    let map = null;
+    let markers = {
+        stations: [],
+        batteries: [],
+        motos: []
+    };
+
     function initMap() {
         const centerCoords = { lat: 4.04343000, lng: 9.74368000 };
-        const map = new google.maps.Map(document.getElementById("map"), {
+        map = new google.maps.Map(document.getElementById("map"), {
             zoom: 12,
             center: centerCoords,
             styles: [
-                // Masquer tous les points d'intérêt
-                { featureType: "poi", stylers: [{ visibility: "off" }] },
-                // Masquer les transports en commun
                 { featureType: "transit", stylers: [{ visibility: "off" }] },
-                // Masquer les labels des routes
-                { featureType: "road", elementType: "labels", stylers: [{ visibility: "off" }] },
-                // Masquer les commerces
-                { featureType: "establishment", stylers: [{ visibility: "off" }] },
-                // Masquer les parcs
-                { featureType: "landscape.man_made", stylers: [{ visibility: "off" }] },
-                // Masquer les labels administratifs
-                { featureType: "administrative", elementType: "labels", stylers: [{ visibility: "off" }] },
-                // Garder seulement les routes et quartiers de base
+                { featureType: "poi.business", stylers: [{ visibility: "off" }] },
+                { featureType: "poi.medical", stylers: [{ visibility: "off" }] },
+                { featureType: "poi.school", stylers: [{ visibility: "off" }] },
+                { featureType: "poi.sports_complex", stylers: [{ visibility: "off" }] },
+                { featureType: "poi.place_of_worship", stylers: [{ visibility: "off" }] },
+                { featureType: "administrative.neighborhood", elementType: "labels", stylers: [{ visibility: "on" }] },
+                { featureType: "administrative.locality", elementType: "labels", stylers: [{ visibility: "on" }] },
+                { featureType: "road", elementType: "labels", stylers: [{ visibility: "on" }] },
                 { featureType: "road", elementType: "geometry", stylers: [{ visibility: "on" }] },
                 { featureType: "landscape", elementType: "geometry", stylers: [{ visibility: "on" }] },
                 { featureType: "water", stylers: [{ visibility: "on" }] }
             ]
         });
 
-        const stations = @json($stationsMap);
-        const batteries = @json($batteriesWithLocation);
-        const motos = @json($motosWithLocation);
-
-        // Icônes personnalisées avec couleurs
-        const icons = {
+        window.mapIcons = {
             station: {
                 url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-house" viewBox="0 0 16 16">
-  <path d="M8.707 1.5a1 1 0 0 0-1.414 0L.646 8.146a.5.5 0 0 0 .708.708L2 8.207V13.5A1.5 1.5 0 0 0 3.5 15h9a1.5 1.5 0 0 0 1.5-1.5V8.207l.646.647a.5.5 0 0 0 .708-.708L13 5.793V2.5a.5.5 0 0 0-.5-.5h-1a.5.5 0 0 0-.5.5v1.293zM13 7.207V13.5a.5.5 0 0 1-.5.5h-9a.5.5 0 0 1-.5-.5V7.207l5-5z"/>
-</svg>
+                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z" fill="#000000" stroke="#FFFFFF" stroke-width="2"/>
+                    </svg>
                 `),
                 scaledSize: new google.maps.Size(32, 32)
             },
             battery: {
                 url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
-                   <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" class="bi bi-battery-charging" viewBox="0 0 16 16">
-                        <path d="M9.585 2.568a.5.5 0 0 1 .226.58L8.677 6.832h1.99a.5.5 0 0 1 .364.843l-5.334 5.667a.5.5 0 0 1-.842-.49L5.99 9.167H4a.5.5 0 0 1-.364-.843l5.333-5.667a.5.5 0 0 1 .616-.09z"/>
-                        <path d="M2 4h4.332l-.94 1H2a1 1 0 0 0-1 1v4a1 1 0 0 0 1 1h2.38l-.308 1H2a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2"/>
-                        <path d="M2 6h2.45L2.908 7.639A1.5 1.5 0 0 0 3.313 10H2zm8.595-2-.308 1H12a1 1 0 0 1 1 1v4a1 1 0 0 1-1 1H9.276l-.942 1H12a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2z"/>
-                        <path d="M12 10h-1.783l1.542-1.639q.146-.156.241-.34zm0-3.354V6h-.646a1.5 1.5 0 0 1 .646.646M16 8a1.5 1.5 0 0 1-1.5 1.5v-3A1.5 1.5 0 0 1 16 8"/>
-                    
+                    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <rect x="4" y="6" width="16" height="12" rx="2" fill="#00AA00" stroke="#FFFFFF" stroke-width="1"/>
+                        <rect x="20" y="9" width="2" height="6" fill="#00AA00"/>
+                        <rect x="6" y="8" width="12" height="8" fill="#FFFFFF"/>
+                        <rect x="7" y="9" width="10" height="6" fill="#00AA00"/>
                     </svg>
                 `),
                 scaledSize: new google.maps.Size(26, 26)
@@ -264,78 +267,243 @@
             }
         };
 
-        // 🏠 STATIONS (Icône bleue)
-        stations.forEach(station => {
-            if (station.latitude && station.longitude) {
-                new google.maps.Marker({
-                    position: { lat: parseFloat(station.latitude), lng: parseFloat(station.longitude) },
-                    map,
-                    title: station.nom,
-                    icon: icons.station
-                });
-            }
+        // Charger les données initiales
+        updateMapMarkers({
+            stationsMap: initialStationsMap,
+            batteriesWithLocation: initialBatteriesWithLocation,
+            motosWithLocation: initialMotosWithLocation
         });
+    }
 
-        // 🔋 BATTERIES (Icône verte)
-        batteries.forEach(battery => {
-            if (battery.latitude && battery.longitude) {
-                new google.maps.Marker({
-                    position: { lat: parseFloat(battery.latitude), lng: parseFloat(battery.longitude) },
-                    map,
-                    title: `Batterie ${battery.mac_id}`,
-                    icon: icons.battery
-                });
-            }
+    function fetchAndUpdateDashboard() {
+        fetch('/dashboard/full-data')
+            .then(res => res.json())
+            .then(data => {
+                const dataHash = JSON.stringify(data);
+
+                if (dataHash !== lastSnapshot) {
+                    lastSnapshot = dataHash;
+                    updateStatsUI(data);
+                    updateMapUI(data);
+                    updateSidebarUI(data);
+                    console.log('✔️ Données mises à jour à ' + new Date().toLocaleTimeString());
+                } else {
+                    console.log('⏸️ Pas de changement détecté');
+                }
+            })
+            .catch(error => {
+                console.error('❌ Erreur de récupération des données:', error);
+            });
+    }
+
+    function updateStatsUI(data) {
+        const stats = data.summaryStats;
+        const levelStats = data.levelStats;
+        
+        // Première série de stats
+        const statsSet1 = document.querySelectorAll('.stats-set')[0];
+        if (statsSet1) {
+            const cards = statsSet1.querySelectorAll('.stat-value');
+            if (cards[0]) cards[0].textContent = data.monthlySwapCount;
+            if (cards[1]) cards[1].textContent = data.chauffeursCount;
+            if (cards[2]) cards[2].textContent = data.totalDistance + ' km';
+        }
+
+        // Deuxième série de stats
+        const statsSet2 = document.querySelectorAll('.stats-set')[1];
+        if (statsSet2) {
+            const cards = statsSet2.querySelectorAll('.stat-value');
+            if (cards[0]) cards[0].textContent = stats.charged;
+            if (cards[1]) cards[1].textContent = stats.charging;
+            if (cards[2]) cards[2].textContent = stats.inactive;
+            if (cards[3]) cards[3].textContent = stats.total;
+        }
+
+        // Troisième série de stats
+        const statsSet3 = document.querySelectorAll('.stats-set')[2];
+        if (statsSet3) {
+            const cards = statsSet3.querySelectorAll('.stat-value');
+            if (cards[0]) cards[0].textContent = levelStats.very_high.count;
+            if (cards[1]) cards[1].textContent = levelStats.high.count;
+            if (cards[2]) cards[2].textContent = levelStats.medium.count;
+            if (cards[3]) cards[3].textContent = levelStats.low.count;
+        }
+    }
+
+    function updateMapUI(data) {
+        if (!map) return;
+        updateMapMarkers(data);
+    }
+
+    function updateMapMarkers(data) {
+        clearMarkers();
+
+        // Stations
+        if (data.stationsMap) {
+            data.stationsMap.forEach(station => {
+                if (station.latitude && station.longitude) {
+                    const marker = new google.maps.Marker({
+                        position: { lat: parseFloat(station.latitude), lng: parseFloat(station.longitude) },
+                        map: map,
+                        title: station.nom,
+                        icon: window.mapIcons.station
+                    });
+                    markers.stations.push(marker);
+                }
+            });
+        }
+
+        // Batteries
+        if (data.batteriesWithLocation) {
+            data.batteriesWithLocation.forEach(battery => {
+                if (battery.latitude && battery.longitude) {
+                    const marker = new google.maps.Marker({
+                        position: { lat: parseFloat(battery.latitude), lng: parseFloat(battery.longitude) },
+                        map: map,
+                        title: `Batterie ${battery.mac_id}`,
+                        icon: window.mapIcons.battery
+                    });
+                    markers.batteries.push(marker);
+                }
+            });
+        }
+
+        // Motos avec InfoWindows
+        if (data.motosWithLocation) {
+            data.motosWithLocation.forEach(moto => {
+                if (moto.latitude && moto.longitude) {
+                    const marker = new google.maps.Marker({
+                        position: { lat: parseFloat(moto.latitude), lng: parseFloat(moto.longitude) },
+                        map: map,
+                        title: moto.driverInfo || moto.macid,
+                        icon: window.mapIcons.moto
+                    });
+
+                    const infoWindow = new google.maps.InfoWindow({
+                        content: `
+                     <div style="padding: 1px; font-family: Arial, sans-serif; min-width: 90px; font-size: 8px; line-height: 0.8;">
+                                <h6 style="margin: 0; color: #333; font-size: 9px;">🏍️ ${moto.driverInfo || 'Moto'}</h6>
+                                <div style="font-size: 7px; line-height: 0.7;">
+                                    <p style="margin: 0; padding: 0;"><strong>ID:</strong> ${moto.macid || 'N/A'}</p>
+                                    <p style="margin: 0; padding: 0;"><strong>Chauffeur:</strong> ${moto.driverInfo || 'Non assigné'}</p>
+                                    <p style="margin: 0; padding: 0;"><strong>Statut:</strong> <span style="color: #00AA00;">En ligne</span></p>
+                                </div>
+                            </div>
+                        `
+                    });
+
+                    infoWindow.open(map, marker);
+
+                    marker.addListener('click', () => {
+                        if (infoWindow.getMap()) {
+                            infoWindow.close();
+                        } else {
+                            infoWindow.open(map, marker);
+                        }
+                    });
+
+                    markers.motos.push({ marker, infoWindow });
+                }
+            });
+        }
+    }
+
+    function clearMarkers() {
+        markers.stations.forEach(marker => marker.setMap(null));
+        markers.stations = [];
+        
+        markers.batteries.forEach(marker => marker.setMap(null));
+        markers.batteries = [];
+        
+        markers.motos.forEach(item => {
+            item.infoWindow.close();
+            item.marker.setMap(null);
         });
+        markers.motos = [];
+    }
 
-        // 🏍️ MOTOS (Icône jaune)
-        motos.forEach(moto => {
-            if (moto.latitude && moto.longitude) {
-                new google.maps.Marker({
-                    position: { lat: parseFloat(moto.latitude), lng: parseFloat(moto.longitude) },
-                    map,
-                    title: moto.driverInfo || moto.macid,
-                    icon: icons.moto
+    function updateSidebarUI(data) {
+        if (!data.stations) return;
+
+        const stationContents = document.querySelectorAll('.station-content');
+        
+        data.stations.forEach((station, index) => {
+            if (stationContents[index]) {
+                const content = stationContents[index];
+                
+                // Mise à jour du nom de la station
+                const agencyName = content.querySelector('.agency-name');
+                if (agencyName) agencyName.textContent = station.nom;
+                
+                // Mise à jour de la localisation
+                const agencyLocation = content.querySelector('.agency-location');
+                if (agencyLocation) {
+                    agencyLocation.innerHTML = `${station.ville} • ${station.batteries_total} Batteries Total , <span>Batterie en Charge : ${station.batteries_en_charge}</span>`;
+                }
+                
+                // Mise à jour des niveaux de batterie
+                const batteryLevels = content.querySelectorAll('.battery-level');
+                if (batteryLevels.length > 1) {
+                    // 90-100%
+                    if (batteryLevels[1]) {
+                        const charging = batteryLevels[1].querySelector('.battery-on-charge');
+                        const count = batteryLevels[1].querySelector('.battery-count');
+                        if (charging) charging.textContent = station.levels.very_high.charging;
+                        if (count) count.textContent = station.levels.very_high.count;
+                    }
+                    // 70-90%
+                    if (batteryLevels[2]) {
+                        const charging = batteryLevels[2].querySelector('.battery-on-charge');
+                        const count = batteryLevels[2].querySelector('.battery-count');
+                        if (charging) charging.textContent = station.levels.high.charging;
+                        if (count) count.textContent = station.levels.high.count;
+                    }
+                    // 40-70%
+                    if (batteryLevels[3]) {
+                        const charging = batteryLevels[3].querySelector('.battery-on-charge');
+                        const count = batteryLevels[3].querySelector('.battery-count');
+                        if (charging) charging.textContent = station.levels.medium.charging;
+                        if (count) count.textContent = station.levels.medium.count;
+                    }
+                    // 10-40%
+                    if (batteryLevels[4]) {
+                        const charging = batteryLevels[4].querySelector('.battery-on-charge');
+                        const count = batteryLevels[4].querySelector('.battery-count');
+                        if (charging) charging.textContent = station.levels.low.charging;
+                        if (count) count.textContent = station.levels.low.count;
+                    }
+                    // <10%
+                    if (batteryLevels[5]) {
+                        const charging = batteryLevels[5].querySelector('.battery-on-charge');
+                        const count = batteryLevels[5].querySelector('.battery-count');
+                        if (charging) charging.textContent = station.levels.critical.charging;
+                        if (count) count.textContent = station.levels.critical.count;
+                    }
+                }
+                
+                // Mise à jour des compteurs
+                const compteurCards = content.querySelectorAll('.compteur-card .compteur-value');
+                station.compteurs.forEach((valeur, index) => {
+                    if (compteurCards[index]) {
+                        compteurCards[index].textContent = valeur;
+                    }
                 });
             }
         });
     }
 
-
-
-
-
-
-
-
-
-
-
-    let lastSnapshot = null;
-
-function fetchAndUpdateDashboard() {
-    fetch('/dashboard/full-data')
-        .then(res => res.json())
-        .then(data => {
-            const dataHash = JSON.stringify(data);
-
-            if (dataHash !== lastSnapshot) {
-                lastSnapshot = dataHash;
-                updateStatsUI(data);
-                updateMapUI(data);
-                updateSidebarUI(data);
-                console.log('✔️ Données mises à jour');
-            } else {
-                console.log('⏸️ Pas de changement détecté');
-            }
-        })
-        .catch(error => {
-            console.error('Erreur de récupération des données:', error);
-        });
-}
-
-setInterval(fetchAndUpdateDashboard, 10000); // vérifie toutes les 10s
-
+    // Démarrer les mises à jour automatiques
+    document.addEventListener('DOMContentLoaded', function() {
+        console.log('🚀 Dashboard temps réel initialisé');
+        
+        // Première mise à jour après 5 secondes
+        setTimeout(() => {
+            fetchAndUpdateDashboard();
+            // Puis toutes les 10 secondes
+            setInterval(fetchAndUpdateDashboard, 10000);
+            console.log('🔄 Mise à jour automatique activée (10s)');
+        }, 5000);
+    });
 </script>
 
 <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBn88TP5X-xaRCYo5gYxvGnVy_0WYotZWo&callback=initMap" async defer></script>

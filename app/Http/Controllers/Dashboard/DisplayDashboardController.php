@@ -294,7 +294,7 @@ class DisplayDashboardController extends Controller
 
 
 //mettre a jour les donnée sur le front_end
-    public function getFullDashboardData()
+   public function getFullDashboardData()
 {
     try {
         $batteries = $this->getAllBatteryBmsData(BatteriesValide::all());
@@ -303,12 +303,14 @@ class DisplayDashboardController extends Controller
             'summaryStats' => $this->getSummaryStats($batteries),
             'levelStats' => $this->getLevelStats($batteries),
             'stationStats' => $this->getStationStats($batteries),
+            'stations' => $this->getStationsWithBatteryDetails($batteries), // ✅ Ajouté pour la sidebar
             'chauffeursCount' => $this->getChauffeursCount(),
             'monthlySwapCount' => $this->getMonthlySwapCount(),
             'totalDistance' => $this->getTotalDistance(),
             'stationsMap' => $this->getStationsForMap(),
             'batteriesWithLocation' => $this->getBatteryLocations(),
-            'motosWithLocation' => $this->getMotosMapData()
+            'motosWithLocation' => $this->getMotosMapData(),
+            'timestamp' => now()->toISOString() // ✅ Pour le debug
         ]);
     } catch (\Throwable $e) {
         Log::error("Erreur dashboard JSON : " . $e->getMessage());
