@@ -281,6 +281,7 @@
 </div>
 
 <!-- Modale Modifier Batterie -->
+<!-- Modale Modifier Batterie -->
 <div class="modal" id="edit-batterie-modal">
     <div class="modal-content">
         <div class="modal-header">
@@ -292,6 +293,11 @@
                 @csrf
                 @method('PUT')
                 <input type="hidden" id="edit-batterie-id" name="id">
+
+                <div class="form-group">
+                    <label for="edit-mac_id">MAC ID</label>
+                    <input type="text" id="edit-mac_id" name="mac_id" required>
+                </div>
                 <div class="form-group">
                     <label for="edit-fabriquant">Fabriquant</label>
                     <input type="text" id="edit-fabriquant" name="fabriquant" required>
@@ -321,18 +327,29 @@
             <span class="close-modal">&times;</span>
         </div>
         <div class="modal-body">
-            <form id="validate-batterie-form">
-                @csrf
-                <input type="hidden" id="validate-batterie-id" name="id">
-                <div class="form-group">
-                    <label for="capacite">Capacité (Ah)</label>
-                    <input type="number" step="0.1" id="capacite" name="capacite" required>
-                </div>
-                <div class="form-group">
-                    <label for="tension">Tension (V)</label>
-                    <input type="number" step="0.1" id="tension" name="tension" required>
-                </div>
-            </form>
+
+    <form id="validate-batterie-form">
+    @csrf
+    <input type="hidden" id="validate-batterie-id" name="id">
+
+    <div class="form-group">
+        <label for="validate-mac_id">MAC ID</label>
+        <input type="text" id="validate-mac_id" name="mac_id" required>
+    </div>
+    <div class="form-group">
+        <label for="validate-fabriquant">Fabriquant</label>
+        <input type="text" id="validate-fabriquant" name="fabriquant" required>
+    </div>
+    <div class="form-group">
+        <label for="validate-gps">GPS</label>
+        <input type="text" id="validate-gps" name="gps" required>
+    </div>
+    <div class="form-group">
+        <label for="validate-date_production">Date de production</label>
+        <input type="date" id="validate-date_production" name="date_production">
+    </div>
+</form>
+
         </div>
         <div class="modal-footer">
             <button class="btn btn-secondary close-modal">Annuler</button>
@@ -516,35 +533,55 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     // Ouvrir la modale d'édition
-    function openEditModal(id) {
-        fetch(`/batteries/${id}/edit`, {
-                headers: {
-                    'Accept': 'application/json'
-                }
-            })
-            .then(response => response.json())
-            .then(batterie => {
-                document.getElementById('edit-batterie-id').value = batterie.id;
-                document.getElementById('edit-fabriquant').value = batterie.fabriquant;
-                document.getElementById('edit-distances').value = batterie.gps;
-                document.getElementById('edit-date_production').value = batterie.date_production ? batterie
-                    .date_production.split('T')[0] : '';
-                editBatterieModal.classList.add('active');
-                document.body.style.overflow = 'hidden';
-            })
-            .catch(error => {
-                console.error('Erreur:', error);
-                showToast('Erreur lors de la récupération de la batterie', 'error');
-            });
-    }
+ function openEditModal(id) {
+    fetch(`/batteries/${id}/edit`)
+        .then(response => {
+            if (!response.ok) throw new Error("Erreur de chargement des données.");
+            return response.json();
+        })
+        .then(data => {
+            document.getElementById('edit-batterie-id').value = data.id;
+            document.getElementById('edit-mac_id').value = data.mac_id;
+            document.getElementById('edit-fabriquant').value = data.fabriquant;
+            document.getElementById('edit-gps').value = data.gps;
+            document.getElementById('edit-date_production').value = data.date_production ? data.date_production.split('T')[0] : '';
+
+            editBatterieModal.classList.add('active');
+            document.body.style.overflow = 'hidden';
+        })
+        .catch(err => {
+            console.error("Erreur :", err);
+            alert("Impossible de charger les données de la batterie.");
+        });
+}
+
 
     // Ouvrir la modale de validation
-    function openValidateModal(row) {
-        const id = row.getAttribute('data-id');
-        document.getElementById('validate-batterie-id').value = id;
+   function openValidateModal(row) {
+    const id = row.getAttribute('data-id');
+    fetch(`/batteries/${id}/validate-form`, {
+        headers: { 'Accept': 'application/json' }
+    })
+    .then(response => {
+        if (!response.ok) throw new Error('Erreur lors du chargement');
+        return response.json();
+    })
+    .then(batterie => {
+        document.getElementById('validate-batterie-id').value = batterie.id;
+        document.getElementById('validate-mac_id').value = batterie.mac_id;
+        document.getElementById('validate-fabriquant').value = batterie.fabriquant;
+        document.getElementById('validate-gps').value = batterie.gps;
+        document.getElementById('validate-date_production').value = batterie.date_production ? batterie.date_production.split('T')[0] : '';
+
         validateBatterieModal.classList.add('active');
         document.body.style.overflow = 'hidden';
-    }
+    })
+    .catch(error => {
+        console.error('Erreur:', error);
+        showToast('Erreur lors du chargement des données pour validation', 'error');
+    });
+}
+
 
     // Ouvrir la modale de suppression
     function openDeleteModal(row) {
@@ -569,6 +606,11 @@ document.addEventListener('DOMContentLoaded', function() {
     function submitAddBatterie() {
         const form = document.getElementById('add-batterie-form');
         const formData = new FormData(form);
+        console.log("Contenu formulaire :");
+for (let [key, value] of formData.entries()) {
+    console.log(`${key}: ${value}`);
+}
+
         fetch('/batteries', {
                 method: 'POST',
                 headers: {
@@ -618,32 +660,30 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     // Soumission du formulaire de validation de batterie
-    function submitValidateBatterie() {
-        const id = document.getElementById('validate-batterie-id').value;
-        const capacite = document.getElementById('capacite').value;
-        const tension = document.getElementById('tension').value;
-        const formData = new FormData();
-        formData.append('capacite', capacite);
-        formData.append('tension', tension);
-        formData.append('_token', csrfToken);
-        fetch(`/batteries/${id}/validate`, {
-                method: 'POST',
-                headers: {
-                    'Accept': 'application/json'
-                },
-                body: formData
-            })
-            .then(response => response.json())
-            .then(validatedBattery => {
-                loadBatteries();
-                closeAllModals();
-                showToast('Batterie validée avec succès', 'success');
-            })
-            .catch(error => {
-                console.error('Erreur de validation:', error);
-                showToast('Erreur lors de la validation de la batterie', 'error');
-            });
-    }
+   function submitValidateBatterie() {
+    const form = document.getElementById('validate-batterie-form');
+    const formData = new FormData(form);
+    const id = document.getElementById('validate-batterie-id').value;
+
+    fetch(`/batteries/${id}/validate`, {
+        method: 'POST',
+        headers: {
+            'X-CSRF-TOKEN': csrfToken,
+            'Accept': 'application/json'
+        },
+        body: formData
+    })
+    .then(response => response.json())
+    .then(result => {
+        loadBatteries();
+        closeAllModals();
+        showToast('Batterie validée avec succès', 'success');
+    })
+    .catch(error => {
+        console.error('Erreur de validation:', error);
+        showToast('Erreur lors de la validation de la batterie', 'error');
+    });
+}
 
     // Soumission de la suppression de batterie
     function submitDeleteBatterie() {

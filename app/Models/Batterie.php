@@ -17,6 +17,7 @@ class Batterie extends Model
     protected $fillable = [
         'batterie_unique_id',
         'mac_id',
+         'gps',
          'date_production',
          'fabriquant',
          'distances',

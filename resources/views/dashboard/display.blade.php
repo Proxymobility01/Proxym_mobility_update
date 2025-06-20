@@ -381,7 +381,7 @@
 
                     const infoWindow = new google.maps.InfoWindow({
                         content: `
-                     <div style="padding: 1px; font-family: Arial, sans-serif; min-width: 90px; font-size: 8px; line-height: 0.8;">
+                            <div style="padding: 1px; font-family: Arial, sans-serif; min-width: 90px; font-size: 8px; line-height: 0.8;">
                                 <h6 style="margin: 0; color: #333; font-size: 9px;">🏍️ ${moto.driverInfo || 'Moto'}</h6>
                                 <div style="font-size: 7px; line-height: 0.7;">
                                     <p style="margin: 0; padding: 0;"><strong>ID:</strong> ${moto.macid || 'N/A'}</p>
@@ -392,14 +392,14 @@
                         `
                     });
 
-                    infoWindow.open(map, marker);
+                    // Afficher seulement au survol
+                    marker.addListener('mouseover', () => {
+                        infoWindow.open(map, marker);
+                    });
 
-                    marker.addListener('click', () => {
-                        if (infoWindow.getMap()) {
-                            infoWindow.close();
-                        } else {
-                            infoWindow.open(map, marker);
-                        }
+                    // Masquer quand on sort du marqueur
+                    marker.addListener('mouseout', () => {
+                        infoWindow.close();
                     });
 
                     markers.motos.push({ marker, infoWindow });

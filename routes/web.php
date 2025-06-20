@@ -82,6 +82,7 @@ Route::middleware('auth')->group(function () {
     Route::prefix('batteries')->name('batteries.')->group(function () {
         Route::get('/', [BatterieController::class, 'index'])->name('index');
         Route::post('/', [BatterieController::class, 'store'])->name('store');
+        Route::get('/{id}/edit', [BatterieController::class, 'edit'])->name('edit');
         Route::put('/{id}', [BatterieController::class, 'update'])->name('update');
         Route::post('/{id}/validate', [BatterieController::class, 'validate'])->name('validate');
         Route::post('/{id}/reject', [BatterieController::class, 'reject'])->name('reject');
@@ -90,6 +91,8 @@ Route::middleware('auth')->group(function () {
         Route::get('/map', [BatterieController::class, 'showBatteriesOnMap'])->name('map');
         Route::get('/api/map-data', [BatterieController::class, 'getBatteriesMapData']);
         Route::get('/api/map-updates', [BatterieController::class, 'getBatteriesUpdates']);
+
+         Route::get('/{id}/validate-form', [BatterieController::class, 'getValidationForm'])->name('getValidationForm');
     });
 
     // BMS

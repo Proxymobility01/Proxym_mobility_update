@@ -8,6 +8,8 @@ use App\Models\MotosValide;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Log;
 use Exception;
+use Illuminate\Support\Facades\DB;
+
 
 class MotoController extends Controller
 {

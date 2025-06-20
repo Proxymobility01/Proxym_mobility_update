@@ -133,37 +133,84 @@ class BatterieController extends Controller
 
     // Ajouter une batterie (support AJAX)
     public function store(Request $request)
-    {
-        try {
-            $validatedData = $request->validate([
-                'mac_id' => 'required|unique:batteries_valides,mac_id',
-                'fabriquant' => 'required',
-                'gps' => 'required',
-                'date_production' => 'nullable|date',
-            ]);
+{
+    try {
+        // Validation sécurisée
+        $validatedData = $request->validate([
+            'mac_id' => 'required|unique:batteries_valides,mac_id',
+            'fabriquant' => 'required|string|max:255',
+            'gps' => 'required|string|max:255',
+            'date_production' => 'nullable|date',
+        ]);
 
-            // Génération de l'ID unique
-            $today = Carbon::now()->format('Ymd');
-            $lastBatterie = BatteriesValide::where('batterie_unique_id', 'like', 'PXB' . $today . '%')
-                ->orderBy('batterie_unique_id', 'desc')
-                ->first();
-            $counter = $lastBatterie ? (int)substr($lastBatterie->batterie_unique_id, -3) + 1 : 1;
-            $uniqueId = 'PXB' . $today . str_pad($counter, 3, '0', STR_PAD_LEFT);
+        // Génération d’un ID unique (format : PXBYYYYMMDDnnn)
+        $today = now()->format('Ymd');
+        $last = BatteriesValide::where('batterie_unique_id', 'like', 'PXB' . $today . '%')
+                        ->orderByDesc('batterie_unique_id')
+                        ->first();
+        $counter = $last ? ((int)substr($last->batterie_unique_id, -3)) + 1 : 1;
+        $uniqueId = 'PXB' . $today . str_pad($counter, 3, '0', STR_PAD_LEFT);
 
-            $batterie = Batterie::create([
-                'mac_id' => $validatedData['mac_id'],
-                'fabriquant' => $validatedData['fabriquant'],
-                'gps' => $validatedData['gps'],
-                'date_production' => $validatedData['date_production'],
-                'batterie_unique_id' => $uniqueId,
-                'statut' => 'en attente'
-            ]);
-            return response()->json($batterie, 201);
-        } catch (Exception $e) {
-            Log::error("Erreur lors de l'ajout de la batterie : " . $e->getMessage());
-            return response()->json(['error' => 'Erreur d\'ajout'], 500);
-        }
+        // Création batterie
+        $batterie = Batterie::create([
+            'mac_id' => $validatedData['mac_id'],
+            'fabriquant' => $validatedData['fabriquant'],
+            'gps' => $validatedData['gps'],
+            'date_production' => $validatedData['date_production'] ?? null,
+            'batterie_unique_id' => $uniqueId,
+            'statut' => 'en attente',
+        ]);
+
+        return response()->json([
+            'message' => 'Batterie ajoutée avec succès',
+            'data' => $batterie,
+        ], 201);
+
+    } catch (ValidationException $e) {
+        // Erreurs de validation
+        return response()->json([
+            'message' => 'Erreur de validation',
+            'errors' => $e->errors(),
+        ], 422);
+
+    } catch (QueryException $e) {
+        // Erreurs SQL (ex: violation contrainte unique, colonnes manquantes)
+        Log::error("Erreur SQL lors de l'ajout de la batterie : " . $e->getMessage());
+        return response()->json([
+            'message' => 'Erreur lors de l’insertion en base de données',
+            'error' => $e->getMessage(),
+        ], 500);
+
+    } catch (\Exception $e) {
+        // Toutes les autres erreurs
+        Log::error("Erreur inattendue lors de l'ajout de la batterie : " . $e->getMessage());
+        return response()->json([
+            'message' => 'Erreur inattendue',
+            'error' => $e->getMessage(),
+        ], 500);
     }
+}
+
+// Ajoute cette méthode dans ton BatterieController
+
+public function edit($id)
+{
+    try {
+        // On vérifie si la batterie est dans la table validée ou temporaire
+        $batterie =  BatteriesValide::find($id) ;
+
+        if (!$batterie) {
+            return response()->json(['error' => 'Batterie introuvable.'], 404);
+        }
+
+        return response()->json($batterie);
+
+    } catch (\Exception $e) {
+        \Log::error("Erreur lors du chargement de la batterie pour édition : " . $e->getMessage());
+        return response()->json(['error' => 'Erreur serveur.'], 500);
+    }
+}
+
 
     // Mise à jour d'une batterie (support AJAX)
     public function update(Request $request, $id)
@@ -188,36 +235,66 @@ class BatterieController extends Controller
         }
     }
 
-    // Valider une batterie
-    public function validate(Request $request, $id)
-    {
-        try {
-            $batterie = Batterie::findOrFail($id);
-            $validatedData = $request->validate([
-                'capacite' => 'required|numeric',
-                'tension' => 'required|numeric',
-            ]);
-            // Créer une batterie validée dans la table dédiée
-            $batterieValidee = BatteriesValide::create([
-                'mac_id' => $batterie->mac_id,
-                'batterie_unique_id' => $batterie->batterie_unique_id,
-                'fabriquant' => $batterie->fabriquant,
-                'gps' => $batterie->gps,
-                'date_production' => $batterie->date_production,
-                'capacite' => $validatedData['capacite'],
-                'tension' => $validatedData['tension'],
-            ]);
-            // Mise à jour du statut et suppression logique
-            $batterie->statut = 'validé';
-            $batterie->deleted_at = Carbon::now();
-            $batterie->save();
-            return response()->json($batterieValidee);
-        } catch (Exception $e) {
-            Log::error("Erreur lors de la validation de la batterie : " . $e->getMessage());
-            return response()->json(['error' => 'Erreur de validation'], 500);
-        }
-    }
 
+// preremplir les champs pour la validation
+    public function getValidationForm($id)
+{
+    try {
+        $batterie = Batterie::findOrFail($id);
+        return response()->json($batterie);
+    } catch (\Exception $e) {
+        \Log::error("Erreur chargement données pour validation : " . $e->getMessage());
+        return response()->json(['error' => 'Batterie introuvable'], 404);
+    }
+}
+
+
+    // Valider une batterie
+
+public function validate(Request $request, $id)
+{
+    DB::beginTransaction();
+
+    try {
+        // Étape 1 : Récupérer la batterie à valider
+        $batterie = Batterie::findOrFail($id);
+
+        // Étape 2 : Mettre à jour ses champs
+        $batterie->mac_id = $request->mac_id;
+        $batterie->fabriquant = $request->fabriquant;
+        $batterie->gps = $request->gps;
+        $batterie->date_production = $request->date_production;
+        $batterie->statut = 'validé';
+        $batterie->save();
+
+        // Étape 3 : Copier les données dans batteries_valides
+        $batterieValide = new BatteriesValide();
+        $batterieValide->batterie_unique_id = $batterie->batterie_unique_id;
+        $batterieValide->mac_id = $batterie->mac_id;
+        $batterieValide->fabriquant = $batterie->fabriquant;
+        $batterieValide->gps = $batterie->gps;
+        $batterieValide->date_production = $batterie->date_production;
+        $batterieValide->statut = 'validé';
+        $batterieValide->save();
+
+        // Étape 4 : Supprimer la batterie de la table source
+        $batterie->delete();
+
+        DB::commit();
+
+        return response()->json([
+            'message' => 'Batterie validée, transférée et supprimée avec succès.'
+        ], 200);
+    } catch (\Exception $e) {
+        DB::rollBack();
+        \Log::error('Erreur transactionnelle lors de la validation : ' . $e->getMessage());
+
+        return response()->json([
+            'error' => 'Échec de la validation. Aucune modification effectuée.',
+            'details' => $e->getMessage()
+        ], 500);
+    }
+}
     // Rejeter une batterie
     public function reject($id)
     {
