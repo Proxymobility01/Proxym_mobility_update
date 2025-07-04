@@ -9,6 +9,7 @@
     <link href="https://fonts.cdnfonts.com/css/metropolis-2" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.7.0/chart.min.js"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@100;200;300;400;500;600;700;800;900&display=swap" rel="stylesheet">
 
 
     <!-- ======= Styles ====== -->

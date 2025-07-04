@@ -19,6 +19,7 @@ class Agence extends Model
         'email',
         'description',
         'logo',
+        'energy',
         'password',
         'longitude',
         'latitude',

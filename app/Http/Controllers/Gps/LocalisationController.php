@@ -12,9 +12,17 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Cache;
+ use App\Services\WhatsAppService;
 
 class LocalisationController extends Controller
 {
+
+    protected $whatsapp;
+
+    public function __construct(WhatsAppService $whatsapp)
+    {
+      $this->whatsapp = $whatsapp;
+    }
     // Clé de cache pour le suivi des états des motos
     const ZONE_STATUS_CACHE_KEY = 'moto_zone_status';
     
@@ -299,7 +307,12 @@ class LocalisationController extends Controller
      */
     private function envoyerAlerteEmployes($moto, $point, $userInfo, $type = 'sortie')
 {
-    $employes = Employe::all();
+     // Limiter à 3 employés spécifiques
+    $employes = Employe::whereIn('email', [
+        'patrick.bika@proxymgroup.com',
+        'joe.tathum@proxymgroup.com',
+        'loic.toche@proxymgroup.com'
+    ])->get();
 
     if ($type === 'sortie') {
         $subject = "ALERTE - Moto sortie de zone Douala";
@@ -309,20 +322,31 @@ class LocalisationController extends Controller
         $body = "La moto VIN: {$moto->vin}\nMacID: {$moto->gps_imei}\nCoordonnées: Latitude {$point['lat']} / Longitude {$point['lng']}\nChauffeur: {$userInfo}\nSituation: ✅ DE RETOUR DANS LA ZONE DOUALA";
     }
 
-    foreach ($employes as $employe) {
+     foreach ($employes as $employe) {
+        // Envoi email
         try {
-            Mail::raw($body, function ($message) use ($employe, $subject) {
+            \Mail::raw($body, function ($message) use ($employe, $subject) {
                 $message->to($employe->email)
                         ->subject($subject)
                         ->from('patrick.bika@proxymgroup.com', 'Proxym Group');
             });
-            Log::info("📧 Mail envoyé à {$employe->email} pour la moto VIN: {$moto->vin} - Type: {$type}");
+            \Log::info("📧 Mail envoyé à {$employe->email} pour VIN {$moto->vin}");
         } catch (\Throwable $e) {
-            Log::error("❌ Échec d'envoi à {$employe->email} : " . $e->getMessage());
+            \Log::error("❌ Erreur mail {$employe->email} : " . $e->getMessage());
+        }
+
+        // Envoi WhatsApp
+        try {
+            if (!empty($employe->phone)) {
+                $this->whatsapp->sendMessage($employe->phone, $body);
+                \Log::info("📲 WhatsApp envoyé à {$employe->phone} pour VIN {$moto->vin}");
+            }
+        } catch (\Throwable $e) {
+            \Log::error("❌ Erreur WhatsApp {$employe->phone} : " . $e->getMessage());
         }
     }
 
-    Log::info("📨 Traitement d'envoi terminé pour VIN: {$moto->vin} - Type: {$type}");
+    \Log::info("📨 Envois terminés pour VIN: {$moto->vin} - Type: {$type}");
 }
 
     private function doualaCoordinates()

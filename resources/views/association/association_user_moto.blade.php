@@ -550,6 +550,7 @@ tr:hover {
                     <th>ID Utilisateur</th>
                     <th>Nom Utilisateur</th>
                     <th>ID Moto</th>
+                    <th>VIN</th>
                     <th>Modèle Moto</th>
                     <th>Date d'association</th>
                     <th>Actions</th>
@@ -561,6 +562,7 @@ tr:hover {
                     <td>{{ $association->validatedUser->user_unique_id }}</td>
                     <td>{{ $association->validatedUser->nom }} {{ $association->validatedUser->prenom }}</td>
                     <td>{{ $association->motosValide->moto_unique_id }}</td>
+                    <td>{{ $association->motosValide->vin }}</td>
                     <td>{{ $association->motosValide->model }}</td>
                     <td>{{ \Carbon\Carbon::parse($association->created_at)->format('d/m/Y') }}</td>
                     <td style="display: flex;">
@@ -623,7 +625,7 @@ tr:hover {
                                 <input type="checkbox" name="moto_unique_id[]" id="moto-{{ $moto->moto_unique_id }}"
                                     value="{{ $moto->moto_unique_id }}" class="moto-checkbox">
                                 <label for="moto-{{ $moto->moto_unique_id }}">
-                                    {{ $moto->model }} ({{ $moto->moto_unique_id }})
+                                    {{ $moto->model }} ({{ $moto->vin }})
                                 </label>
                             </div>
                             @endforeach

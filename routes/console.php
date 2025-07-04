@@ -30,7 +30,7 @@ Schedule::call(function () {
 
 Schedule::call(function () {
     app(DailyDistanceController::class)->updateDailyDistances();
-})->everyMinute();
+})->everyTenMinutes();
 
 
 // cron job derniere positions des moto
@@ -39,6 +39,6 @@ Schedule::call(function () {
 })->everyMinute();
 
 
-Schedule::call(function () {
-    app(DashboardController::class)->updateBatteryCache();
-})->everyMinute(); // ou everyMinute() pour tester
+//Schedule::call(function () {
+    //app(DashboardController::class)->updateBatteryCache();
+//})->everyMinute(); // ou everyMinute() pour tester

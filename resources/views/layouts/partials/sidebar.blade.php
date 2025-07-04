@@ -8,10 +8,14 @@
         <i class="fas fa-chevron-left"></i>
     </button>
 
-    <div class="logo-container">
-        <i class="fas fa-bolt logo-icon"></i>
-        <span class="logo-text">Proxym Mobility</span>
-    </div>
+    <a href="{{ route('display.index') }}">
+        <div class="logo-container">
+            <div class="logo-icon">
+                <img src="{{ asset('assets/images/logo.png') }}" alt="PROXYM Logo">
+            </div>
+            <span>Proxym</span>
+        </div>
+    </a>
     <a href="{{ route('dashboard') }}">
         <div class="nav-item active">
             <i class="fas fa-home"></i>

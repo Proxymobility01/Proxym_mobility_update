@@ -23,38 +23,19 @@ use App\Http\Controllers\Compteur\CompteurController;
 use App\Http\Controllers\DailyDistanceController;
 use App\Http\Controllers\Dashboard\DisplayDashboardController;
 
+use App\Http\Controllers\Batteries\BatterieSOEController;
+
+
 Route::get('/', function () {
     return view('welcome');
 });
 
 
-Route::get('/dashboard/display', [DisplayDashboardController::class, 'index'])->name('display.index');
-Route::get('/dashboard/full-data', [DisplayDashboardController::class, 'getFullDashboardData']);
 
+Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard.index');
 
-Route::get('/compteur/test', [CompteurController::class, 'index'])->name('compteur.index');
-Route::post('/compteur/envoyer', [CompteurController::class, 'envoyerMessage'])->name('compteur.envoyer');
 
 //Route::get('/', [DashboardController::class, 'index'])->middleware(['auth', 'verified'])->name('dashboard');
-
-// Routes du Dashboard
-
-// Dans routes/web.php
-Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard.index');
-Route::get('/dashboard/filter', [DashboardController::class, 'filter'])->name('dashboard.filter');
-Route::get('/dashboard/inactive-batteries', [DashboardController::class, 'getInactiveBatteries'])->name('dashboard.inactive-batteries');
-
-
-
-
-Route::get('/recalculer-distances', [DailyDistanceController::class, 'recalculerDistanceParPlage'])
-    ->name('distances.recalculer');
-
-// Routes API pour les batteries
-Route::prefix('api')->group(function () {
-    Route::get('/inactive-batteries', [DashboardController::class, 'getInactiveBatteries'])->name('api.inactive_batteries');
-    Route::get('/batteries/{id}', [DashboardController::class, 'getBatteryDetails'])->name('api.battery_details');
-});
 
 Route::middleware('auth')->group(function () {
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
@@ -63,11 +44,32 @@ Route::middleware('auth')->group(function () {
 
 
 
+    
+// Routes du Dashboard
+Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard.index');
+Route::get('/dashboard/filter', [DashboardController::class, 'filter'])->name('dashboard.filter');
+Route::get('/dashboard/inactive-batteries', [DashboardController::class, 'getInactiveBatteries'])->name('dashboard.inactive-batteries');
+   Route::get('/', [DashboardController::class, 'index'])->name('dashboard');
+
+   
+// compteur
+Route::get('/compteur/test', [CompteurController::class, 'index'])->name('compteur.index');
+Route::post('/compteur/envoyer', [CompteurController::class, 'envoyerMessage'])->name('compteur.envoyer');
+
+// display dashpoard
+Route::get('/dashboard/display', [DisplayDashboardController::class, 'index'])->name('display.index');
+Route::get('/dashboard/full-data', [DisplayDashboardController::class, 'getFullDashboardData']);
+
+// Routes API pour les batteries
+Route::prefix('api')->group(function () {
+    Route::get('/inactive-batteries', [DashboardController::class, 'getInactiveBatteries'])->name('api.inactive_batteries');
+    Route::get('/batteries/{id}', [DashboardController::class, 'getBatteryDetails'])->name('api.battery_details');
+});
 
 
 
-    Route::get('/', [DashboardController::class, 'index'])->name('dashboard');
 
+ 
     // Motos
     Route::prefix('motos')->name('motos.')->group(function () {
         Route::get('/', [MotoController::class, 'index'])->name('index');
@@ -210,6 +212,10 @@ Route::middleware('auth')->group(function () {
     Route::post('/distances/filter', [App\Http\Controllers\DailyDistanceController::class, 'filter']);
     Route::post('/distances/calculate', [App\Http\Controllers\DailyDistanceController::class, 'calculateDailyDistances']);
 
+    // route pour recalculer les distance sur une plage de date
+    Route::get('/recalculer-distances', [DailyDistanceController::class, 'recalculerDistanceParPlage'])
+    ->name('distances.recalculer');
+
 
 // Route principale pour la page des leases
 Route::get('/leases', [App\Http\Controllers\Leases\LeaseController::class, 'index'])->name('leases.index');
@@ -227,6 +233,11 @@ Route::get('/batteries/station', [BatteryStationController::class, 'index'])->na
 Route::get('/batteries/station/export', [BatteryStationController::class, 'export'])->name('batteries.station.export');
 Route::get('/batteries/station/stats', [BatteryStationController::class, 'getStats'])->name('batteries.station.stats');
 
+
+
+
+Route::get('/batteries/soe', [BatterieSOEController::class, 'showSoeAtFullCharge'])->name('batterie.soe');
 });
+
 
 require __DIR__.'/auth.php';

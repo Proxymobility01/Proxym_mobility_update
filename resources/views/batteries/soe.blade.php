@@ -1,4 +1,8 @@
-* {
+@extends('layouts.app')
+
+@section('content')
+<style>
+    * {
     margin: 0;
     padding: 0;
     box-sizing: border-box;
@@ -1557,3 +1561,162 @@ td {
 .close-modal:hover {
     color: #000 !important;
 }
+</style>
+<div class="main-content">
+    <h2>📊 Analyse SOE des batteries (SOC à 100%)</h2>
+
+    <form method="GET" action="{{ route('batterie.soe') }}" class="mb-4">
+        <div class="row">
+            <div class="col-md-3">
+                <label>Début</label>
+                <input type="date" name="start" value="{{ $start ?? '' }}" class="form-control" required>
+            </div>
+            <div class="col-md-3">
+                <label>Fin</label>
+                <input type="date" name="end" value="{{ $end ?? '' }}" class="form-control" required>
+            </div>
+            <div class="col-md-2 align-self-end">
+                <button type="submit" class="btn btn-primary">🔍 Rechercher</button>
+            </div>
+        </div>
+    </form>
+
+    @if($error)
+        <div class="alert alert-danger">{{ $error }}</div>
+    @endif
+
+    @if(isset($results) && count($results))
+        <div class="export-buttons mt-3 mb-3">
+            <button id="exportExcel" class="btn btn-success">
+                <i class="fas fa-file-excel"></i> Exporter Excel
+            </button>
+            <button id="exportPDF" class="btn btn-danger">
+                <i class="fas fa-file-pdf"></i> Exporter PDF
+            </button>
+            <button id="exportCSV" class="btn btn-info">
+                <i class="fas fa-file-csv"></i> Exporter CSV
+            </button>
+        </div>
+
+        <table class="table table-bordered table-striped" id="soeTable">
+            <thead>
+                <tr>
+                    <th>Mac ID</th>
+                    <th>SOC (%)</th>
+                    <th>SOE (SYLA)</th>
+                    <th>Date</th>
+                    <th>Heure</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach($results as $row)
+                <tr>
+                    <td>{{ $row->mac_id }}</td>
+                    <td>{{ $row->soc }}</td>
+                    <td>{{ $row->soe }}</td>
+                    <td>{{ $row->date }}</td>
+                    <td>{{ \Carbon\Carbon::parse($row->first_seen)->format('H:i:s') }}</td>
+                </tr>
+                @endforeach
+            </tbody>
+        </table>
+    @elseif(isset($results))
+        <div class="alert alert-info mt-3">Aucune batterie à 100% SOC trouvée dans la période.</div>
+    @endif
+
+
+<!-- SheetJS (Excel) -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<!-- html2pdf.js (PDF) -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+    const table = document.getElementById('soeTable');
+
+    if (table) {
+        const btnExcel = document.getElementById('exportExcel');
+        const btnCSV = document.getElementById('exportCSV');
+        const btnPDF = document.getElementById('exportPDF');
+
+        // Export Excel
+        btnExcel?.addEventListener('click', function () {
+            const wb = XLSX.utils.book_new();
+            const ws_data = [];
+
+            const rows = table.querySelectorAll('tr');
+
+            rows.forEach((row, i) => {
+                const rowData = [];
+                row.querySelectorAll('th, td').forEach((cell, j) => {
+                    let text = cell.textContent.trim();
+
+                    // Si c'est la colonne Mac ID (colonne 0 après en-tête), ajoute '
+                    if (j === 0 && i > 0) {
+                        text = `'${text}`;
+                    }
+                    rowData.push(text);
+                });
+                ws_data.push(rowData);
+            });
+
+            const ws = XLSX.utils.aoa_to_sheet(ws_data);
+            XLSX.utils.book_append_sheet(wb, ws, 'SOE');
+            XLSX.writeFile(wb, 'SOE_analysis.xlsx');
+        });
+
+        // Export CSV
+        btnCSV?.addEventListener('click', function () {
+            let csv = '';
+            const rows = table.querySelectorAll('tr');
+
+            rows.forEach((row, i) => {
+                const cells = row.querySelectorAll('td, th');
+                let rowData = [];
+                cells.forEach((cell, j) => {
+                    let text = cell.textContent.trim().replace(/"/g, '""');
+
+                    // Si c'est la colonne Mac ID, ajoute '
+                    if (j === 0 && i > 0) {
+                        text = "'" + text;
+                    }
+                    rowData.push('"' + text + '"');
+                });
+                csv += rowData.join(',') + '\n';
+            });
+
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'SOE_analysis.csv';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+        });
+
+        // Export PDF
+        btnPDF?.addEventListener('click', function () {
+            html2pdf()
+                .from(table)
+                .set({
+                    margin: 10,
+                    filename: 'SOE_analysis.pdf',
+                    html2canvas: { scale: 2 },
+                    jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' }
+                })
+                .save();
+        });
+    }
+});
+</script>
+
+
+</div>
+
+
+@endsection
+
+
+
+

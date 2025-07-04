@@ -42,7 +42,7 @@
         .logo-icon {
             width: 50px;
             height: 50px;
-            background: linear-gradient(45deg, #ffd700, #ffeb3b);
+            background: linear-gradient(45deg, #131212, #978a1c);
             border-radius: 15px;
             display: flex;
             align-items: center;
@@ -56,6 +56,7 @@
             font-size: 28px;
             font-weight: 900;
             letter-spacing: 2px;
+            color: #DCDB32;
         }
 
         .logo-subtitle {
@@ -63,6 +64,48 @@
             color: #a0aec0;
             margin-top: -5px;
         }
+        /* ===========================================
+   STYLES LOGO PROXYM - CSS SÉPARÉ
+   =========================================== */
+
+.logo-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.logo-icon a {
+    display: block;
+    text-decoration: none;
+    line-height: 0;
+}
+
+.logo-image {
+    width: 45px;
+    height: 45px;
+    object-fit: contain;
+    border-radius: 4px;
+    transition: opacity 0.3s ease;
+}
+
+.logo-image:hover {
+    opacity: 0.8;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .logo-image {
+        width: 35px;
+        height: 35px;
+    }
+}
+
+@media (max-width: 480px) {
+    .logo-image {
+        width: 30px;
+        height: 30px;
+    }
+}
 
         .status-time {
             display: flex;
@@ -552,3 +595,28 @@
             0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(255, 215, 0, 0.7); }
             50% { transform: scale(1.2); box-shadow: 0 0 0 10px rgba(255, 215, 0, 0); }
         }
+
+
+
+
+
+
+
+
+
+          .energy-alert {
+    animation: blinkEnergy 1s alternate infinite;
+    background-color: orange !important;
+    border: 3px solid black !important;
+}
+
+@keyframes blinkEnergy {
+    0% { background-color: orange; }
+    100% { background-color: black; }
+}
+
+.energy-off {
+    background-color: #ff0000 !important;
+    color: white;
+    border: 2px solid #b30000;
+}

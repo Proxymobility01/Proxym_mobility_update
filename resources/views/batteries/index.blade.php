@@ -118,6 +118,11 @@
     background-color: #dc3545;
     color: white;
 }
+
+
+
+
+
 </style>
 @endsection
 
@@ -166,6 +171,9 @@
         </div>
     </div>
 
+ 
+
+
     <!-- Cartes des statistiques -->
     <div class="stats-grid">
         <div class="stat-card total">
@@ -211,6 +219,22 @@
                 <div class="stat-text">Non conformes</div>
             </div>
         </div>
+    </div>
+
+       <!-- Boutons d'export -->
+    <div class="export-buttons">
+        <button id="exportExcel" class="export-btn btn-excel">
+            <i class="fas fa-file-excel"></i>
+            Exporter Excel
+        </button>
+        <button id="exportPDF" class="export-btn btn-pdf">
+            <i class="fas fa-file-pdf"></i>
+            Exporter PDF
+        </button>
+        <button id="exportCSV" class="export-btn btn-csv">
+            <i class="fas fa-file-csv"></i>
+            Exporter CSV
+        </button>
     </div>
 
     <!-- Tableau des batteries -->
@@ -772,6 +796,106 @@ for (let [key, value] of formData.entries()) {
         });
     });
 </script>
+
+
+<script>
+// Fonction utilitaire pour récupérer les données visibles du tableau
+function getFilteredTableData() {
+    const rows = document.querySelectorAll('#batteries-table tbody tr');
+    const data = [];
+
+    rows.forEach(row => {
+        const cells = row.querySelectorAll('td');
+        if (cells.length > 1) {
+            data.push([
+                cells[0].textContent.trim(), // ID Batterie
+                cells[1].textContent.trim(), // MAC ID
+                cells[2].textContent.trim(), // Fabriquant
+                cells[3].textContent.trim(), // SOC
+                cells[4].textContent.trim(), // Statut
+                cells[5].textContent.trim()  // Date d'ajout
+            ]);
+        }
+    });
+
+    return data;
+}
+
+// =============================
+// EXPORT CSV (UTF-8 avec BOM)
+// =============================
+document.getElementById('exportCSV').addEventListener('click', () => {
+    const data = getFilteredTableData();
+    let csvContent = "\uFEFF"; // BOM
+    csvContent += "ID Batterie,MAC ID,Fabriquant,SOC %,Statut,Date d'ajout\n";
+
+    data.forEach(row => {
+        const escapedRow = row.map(col => `"${col.replace(/"/g, '""')}"`);
+        csvContent += escapedRow.join(",") + "\n";
+    });
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = "batteries_filtrees.csv";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+});
+
+// =============================
+// EXPORT EXCEL (.xlsx via SheetJS)
+// =============================
+document.getElementById('exportExcel').addEventListener('click', () => {
+    const headers = ["ID Batterie", "MAC ID", "Fabriquant", "SOC %", "Statut", "Date d'ajout"];
+    const data = getFilteredTableData();
+    const worksheetData = [headers, ...data];
+
+    const worksheet = XLSX.utils.aoa_to_sheet(worksheetData);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Batteries");
+
+    XLSX.writeFile(workbook, "batteries_filtrees.xlsx");
+});
+
+// =============================
+// EXPORT PDF (via jsPDF + autoTable)
+// =============================
+document.getElementById('exportPDF').addEventListener('click', () => {
+    const data = getFilteredTableData();
+    const headers = ["ID Batterie", "MAC ID", "Fabriquant", "SOC %", "Statut", "Date d'ajout"];
+    const doc = new jspdf.jsPDF();
+
+    doc.setFontSize(14);
+    doc.text("Liste des batteries filtrées", 14, 15);
+
+    doc.autoTable({
+        startY: 20,
+        head: [headers],
+        body: data,
+        styles: {
+            font: 'helvetica',
+            fontSize: 10,
+            cellPadding: 3,
+        },
+        headStyles: {
+            fillColor: [220, 219, 50], // Couleur jaune PROXYM
+            textColor: 16,
+            halign: 'center'
+        },
+        bodyStyles: {
+            halign: 'left'
+        }
+    });
+
+    doc.save("batteries_filtrees.pdf");
+});
+</script>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.29/jspdf.plugin.autotable.min.js"></script>
+
 
 
 @endsection

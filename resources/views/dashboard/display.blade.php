@@ -11,9 +11,13 @@
     <div class="dashboard">
         <div class="header">
             <div class="logo">
-                <div class="logo-icon">⚡</div>
+                <div class="logo-icon">
+    <a href="{{ route('dashboard') }}">
+        <img src="{{ asset('assets/images/logo.png') }}" alt="PROXYM Logo" class="logo-image">
+    </a>
+</div>
                 <div>
-                    <div class="logo-text">PROXYM</div>
+                    <div class="logo-text">PROXYM </div>
                     <div class="logo-subtitle">BATTERY MANAGEMENT</div>
                 </div>
             </div>
@@ -126,7 +130,7 @@
         <div class="sidebar">
             <div class="station-overview">
               @foreach($stations as $index => $station)
-    <div class="station-content {{ $index === 0 ? 'active' : '' }}">
+    <div class="station-content {{ $index === 0 ? 'active' : '' }}" id="station-{{ $index }}">
         <div class="agency-header">
             <div class="agency-title">
                 <div class="agency-icon">🏢</div>
@@ -504,7 +508,35 @@
             console.log('🔄 Mise à jour automatique activée (10s)');
         }, 5000);
     });
+
+
+
+
+// animation coupure d'électricité
+       data.stations.forEach((station, index) => {
+    const content = document.getElementById('station-' + index);
+    if (!content) return;
+
+    if (station.energy == 0 && !content.classList.contains('energy-off')) {
+        // Scroll vers la div
+        content.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+        // Ajouter l'animation
+        content.classList.add('energy-alert');
+
+        // Après 10s, arrêter l'animation et mettre en rouge
+        setTimeout(() => {
+            content.classList.remove('energy-alert');
+            content.classList.add('energy-off');
+        }, 10000);
+    } else if (station.energy == 1) {
+        // Si énergie est revenue, retirer les classes
+        content.classList.remove('energy-alert', 'energy-off');
+    }
+});
 </script>
+
+
 
 <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBn88TP5X-xaRCYo5gYxvGnVy_0WYotZWo&callback=initMap" async defer></script>
 
@@ -548,5 +580,7 @@
 
         setInterval(rotateStations, 20000);
     </script>
+
+
 </body>
 </html>

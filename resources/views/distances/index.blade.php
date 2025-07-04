@@ -292,9 +292,12 @@ tr:hover {
     <div class="content-header">
         <h2>Suivi des distances quotidiennes</h2>
         <div id="current-date" class="date">{{ now()->format('d/m/Y') }}</div>
-        <button id="recalculateBtn" class="export-btn btn-recalculate">
-            <i class="fas fa-sync-alt mr-2"></i> Recalculer les distances
-        </button>
+        <form action="{{ route('distances.recalculer') }}" method="GET">
+    <button type="submit" class="btn btn-warning">
+        🔄 Recalculer distances sur la plage définie
+    </button>
+</form>
+
     </div>
 
     <!-- Cartes des statistiques -->

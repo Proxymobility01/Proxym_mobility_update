@@ -188,6 +188,7 @@ class DisplayDashboardController extends Controller
                 'longitude' => $station->longitude,
                 'batteries_total' => $stationBatteries->count(),
                 'batteries_en_charge' => $stationBatteries->where('work_status_code', '1')->count(),
+                'energy' => $station->energy,
                 'levels' => [
                     'very_high' => [
                         'count' => $stationBatteries->whereBetween('soc', [90, 100])->count(),
