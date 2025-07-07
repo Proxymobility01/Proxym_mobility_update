@@ -22,7 +22,7 @@ jobs:
 
       - name: Rsync files to VPS
         run: |
-          rsync -rltDvz --chmod=ugo=rwX --delete --no-perms --no-owner --no-group \
+          rsync -rltDvz --no-times --chmod=ugo=rwX --delete --no-perms --no-owner --no-group \
             --exclude ".git" \
             --exclude "vendor/" \
             ./ ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/home/ubuntu/ProxymUpdate/ProxymAuthMNew
