@@ -292,8 +292,8 @@ public function fullDataJson()
                 ->values()
                 ->map(fn($item) => [
                     'mac_id' => $item->mac_id,
-                    'latitude' => $item->latitude,
-                    'longitude' => $item->longitude,
+                    'latitude' => $item->longitude,
+                    'longitude' => $item->latitude,
                 ]);
         });
     }
