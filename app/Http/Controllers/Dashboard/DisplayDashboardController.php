@@ -25,47 +25,90 @@ class DisplayDashboardController extends Controller
     {
         \Log::info("=== CHARGEMENT DASHBOARD DISPLAY ===");
 
-        $batteries = $this->getAllBatteryBmsData(BatteriesValide::all());
-        $summaryStats = $this->getSummaryStats($batteries);
-        $levelStats = $this->getLevelStats($batteries);
-        $stationStats = $this->getStationStats($batteries);
-        $chauffeursCount = $this->getChauffeursCount();
-        $monthlySwapCount = $this->getMonthlySwapCount();
-        $totalDistance = $this->getTotalDistance();
-        $stations = $this->getStationsWithBatteryDetails($batteries);
-        $stationsMap = $this->getStationsForMap();
-        $batteriesWithLocation = $this->getBatteryLocations();
-        $motosWithLocation = $this->getMotosMapData();
+        // ✅ Charger depuis le cache, ou reconstruire si expiré
+        $data = $this->getFullDashboardData();
 
-        return view('dashboard.display', [
-            'summaryStats' => $summaryStats,
-            'levelStats' => $levelStats,
-            'stationStats' => $stationStats,
-            'stations' => $stations,
-            'stationsMap' => $stationsMap,
-            'chauffeursCount' => $chauffeursCount,
-            'monthlySwapCount' => $monthlySwapCount,
-            'totalDistance' => $totalDistance,
-            'batteriesWithLocation' => $batteriesWithLocation,
-            'motosWithLocation' => $motosWithLocation,
-        ]);
+        return view('dashboard.display', $data);
     }
 
-    private function getAllBatteryBmsData($batteries)
+    /**
+     * Fournit toutes les données du dashboard
+     */
+    public function getFullDashboardData()
+{
+    return Cache::remember('dashboard_full_data', 10, function () {
+        $agences = $this->getAllAgences();
+        $batteriesAll = $this->getAllBatteriesValide();
+        $latestBms = $this->getAllLatestBms();
+
+        $batteries = $this->getAllBatteryBmsData($batteriesAll, $latestBms);
+
+        return [
+            'summaryStats' => $this->getSummaryStats($batteries),
+            'levelStats' => $this->getLevelStats($batteries),
+            'stationStats' => $this->getStationStats($batteries, $agences),
+            'stations' => $this->getStationsWithBatteryDetails($batteries, $agences),
+            'chauffeursCount' => $this->getChauffeursCount(),
+            'monthlySwapCount' => $this->getMonthlySwapCount(),
+            'totalDistance' => $this->getTotalDistance(),
+            'stationsMap' => $this->getStationsForMap($agences),
+            'batteriesWithLocation' => $this->getBatteryLocations(),
+            'motosWithLocation' => $this->getMotosMapData(),
+            'timestamp' => now()->toISOString(),
+        ];
+    });
+}
+
+public function fullDataJson()
+{
+    $data = $this->getFullDashboardData();
+
+    return response()->json($data);
+}
+
+
+
+    private function getAllAgences()
     {
-        return $batteries->map(function ($battery) {
-            \Log::info("Batterie ID: {$battery->id}, MAC: {$battery->mac_id}");
-            $bms = Cache::remember("battery_bms_{$battery->mac_id}", 60, function () use ($battery) {
-                return BMSData::where('mac_id', $battery->mac_id)->latest('timestamp')->first();
-            });
+        return Cache::remember('agences_all', 10, function () {
+            return Agence::all()->keyBy(fn($a) => $a->id_agence ?: $a->id);
+        });
+    }
+
+    private function getAllBatteriesValide()
+    {
+        return Cache::remember('batteries_valide_all', 600, function () {
+            return BatteriesValide::with('agences')->get();
+        });
+    }
+
+    private function getAllLatestBms()
+    {
+        return Cache::remember('latest_bms_data', 60, function () {
+            return BMSData::select('bms_data.*')
+                ->join(DB::raw('(SELECT mac_id, MAX(timestamp) as max_ts FROM bms_data GROUP BY mac_id) as sub'),
+                    function ($join) {
+                        $join->on('bms_data.mac_id', '=', 'sub.mac_id');
+                        $join->on('bms_data.timestamp', '=', 'sub.max_ts');
+                    })
+                ->get()
+                ->keyBy('mac_id');
+        });
+    }
+
+    private function getAllBatteryBmsData($batteries, $latestBms)
+    {
+        return $batteries->map(function ($battery) use ($latestBms) {
+            $bms = $latestBms->get($battery->mac_id);
 
             $state = json_decode($bms->state ?? '{}', true);
             $seting = json_decode($bms->seting ?? '{}', true);
+
             $soc = $state['SOC'] ?? 0;
             $workStatus = $state['WorkStatus'] ?? '3';
             $status = $this->getBatteryStatus($workStatus);
-            $online = false;
 
+            $online = false;
             if (isset($seting['heart_time'])) {
                 try {
                     $online = Carbon::createFromTimestamp($seting['heart_time'])->diffInMinutes(now()) < 5;
@@ -74,13 +117,12 @@ class DisplayDashboardController extends Controller
                 }
             }
 
-            $stationIds = [];
-            $stationNames = [];
-
-            if ($battery->agences) {
-                $stationIds = $battery->agences->map(fn($a) => $a->id_agence ?: $a->id)->toArray();
-                $stationNames = $battery->agences->pluck('nom_agence')->toArray();
-            }
+            $stationIds = $battery->agences
+                ? $battery->agences->pluck('id_agence')->filter()->values()->all()
+                : [];
+            $stationNames = $battery->agences
+                ? $battery->agences->pluck('nom_agence')->all()
+                : [];
 
             return [
                 'id' => $battery->id,
@@ -90,7 +132,7 @@ class DisplayDashboardController extends Controller
                 'soc' => $soc,
                 'status' => $status,
                 'work_status_code' => $workStatus,
-                'online' => $online
+                'online' => $online,
             ];
         });
     }
@@ -101,7 +143,7 @@ class DisplayDashboardController extends Controller
             '0' => 'En décharge',
             '1' => 'En charge',
             '2' => 'En veille',
-            '3' => 'Défaut'
+            '3' => 'Défaut',
         ][$code] ?? 'Inconnu';
     }
 
@@ -115,37 +157,52 @@ class DisplayDashboardController extends Controller
         $discharged = $batteries->where('soc', '<', 30)->count();
         $notCharging = $batteries->where('online', true)->where('work_status_code', '!=', '1')->count();
 
-        return compact('total', 'active', 'inactive', 'charged', 'charging', 'discharged', 'notCharging');
+        return compact(
+            'total',
+            'active',
+            'inactive',
+            'charged',
+            'charging',
+            'discharged',
+            'notCharging'
+        );
     }
 
     private function getLevelStats($batteries)
     {
-        $total = $batteries->count();
-        $levels = [
-            'very_high' => $batteries->whereBetween('soc', [90, 100]),
-            'high' => $batteries->whereBetween('soc', [70, 89]),
-            'medium' => $batteries->whereBetween('soc', [40, 69]),
-            'low' => $batteries->whereBetween('soc', [10, 39]),
+        $ranges = [
+            'very_high' => [90, 100],
+            'high' => [70, 89],
+            'medium' => [40, 69],
+            'low' => [10, 39],
         ];
 
+        return $this->computeLevelStats($batteries, $ranges);
+    }
+
+    private function computeLevelStats($batteries, $ranges)
+    {
+        $total = $batteries->count();
         $result = [];
-        foreach ($levels as $key => $group) {
+
+        foreach ($ranges as $name => [$min, $max]) {
+            $group = $batteries->filter(fn($b) => $b['soc'] >= $min && $b['soc'] <= $max);
             $count = $group->count();
             $charging = $group->where('work_status_code', '1')->count();
-            $result[$key] = [
+
+            $result[$name] = [
                 'count' => $count,
                 'charging' => $charging,
-                'percentage' => $total > 0 ? round(($count / $total) * 100, 1) : 0
+                'percentage' => $total > 0 ? round(($count / $total) * 100, 1) : 0,
             ];
         }
 
         return $result;
     }
 
-    private function getStationStats($batteries)
+    private function getStationStats($batteries, $agences)
     {
-        $stations = Agence::all();
-        return $stations->map(function ($station) use ($batteries) {
+        return $agences->values()->map(function ($station) use ($batteries) {
             $stationId = $station->id_agence ?: $station->id;
             $stationBatteries = $batteries->filter(fn($b) => in_array($stationId, $b['station_ids']));
 
@@ -161,162 +218,148 @@ class DisplayDashboardController extends Controller
                     '90-100' => $stationBatteries->whereBetween('soc', [90, 100])->count(),
                     '70-90' => $stationBatteries->whereBetween('soc', [70, 89])->count(),
                     '40-70' => $stationBatteries->whereBetween('soc', [40, 69])->count(),
-                    '10-40' => $stationBatteries->whereBetween('soc', [10, 39])->count()
-                ]
+                    '10-40' => $stationBatteries->whereBetween('soc', [10, 39])->count(),
+                ],
             ];
         });
     }
 
-    private function getStationsWithBatteryDetails($batteries)
-    {
-        return Agence::all()->map(function ($station) use ($batteries) {
-            $stationId = $station->id_agence ?: $station->id;
-            $stationBatteries = $batteries->filter(fn($b) => in_array($stationId, $b['station_ids']));
+   private function getStationsWithBatteryDetails($batteries, $agences)
+{
+    return $agences->values()->map(function ($station) use ($batteries) {
+        $stationId = $station->id_agence ?: $station->id;
 
-            $latestReading = PowerReading::where('agence_id', $stationId)->latest()->first();
-            $compteurs = $latestReading ? [
+        $stationBatteries = $batteries->filter(
+            fn($b) => in_array($stationId, $b['station_ids'])
+        );
+
+        $levels = $this->computeLevelStats($stationBatteries, [
+            'very_high' => [90, 100],
+            'high' => [70, 89],
+            'medium' => [40, 69],
+            'low' => [10, 39],
+            'critical' => [0, 9],
+        ]);
+
+        $latestReading = Cache::remember("station_reading_$stationId", 5, function () use ($stationId) {
+            return PowerReading::where('agence_id', $stationId)->latest()->first();
+        });
+
+        $compteurs = $latestReading
+            ? [
                 $latestReading->kw1,
                 $latestReading->kw2,
                 $latestReading->kw3,
-                $latestReading->kw4
-            ] : ['N/A', 'N/A', 'N/A', 'N/A'];
+                $latestReading->kw4,
+            ]
+            : ['N/A', 'N/A', 'N/A', 'N/A'];
 
-            return [
-                'nom' => $station->nom_agence,
-                'ville' => $station->ville ?? 'Douala',
-                'latitude' => $station->latitude,
-                'longitude' => $station->longitude,
-                'batteries_total' => $stationBatteries->count(),
-                'batteries_en_charge' => $stationBatteries->where('work_status_code', '1')->count(),
-                'energy' => $station->energy,
-                'levels' => [
-                    'very_high' => [
-                        'count' => $stationBatteries->whereBetween('soc', [90, 100])->count(),
-                        'charging' => $stationBatteries->whereBetween('soc', [90, 100])->where('work_status_code', '1')->count()
-                    ],
-                    'high' => [
-                        'count' => $stationBatteries->whereBetween('soc', [70, 89])->count(),
-                        'charging' => $stationBatteries->whereBetween('soc', [70, 89])->where('work_status_code', '1')->count()
-                    ],
-                    'medium' => [
-                        'count' => $stationBatteries->whereBetween('soc', [40, 69])->count(),
-                        'charging' => $stationBatteries->whereBetween('soc', [40, 69])->where('work_status_code', '1')->count()
-                    ],
-                    'low' => [
-                        'count' => $stationBatteries->whereBetween('soc', [10, 39])->count(),
-                        'charging' => $stationBatteries->whereBetween('soc', [10, 39])->where('work_status_code', '1')->count()
-                    ],
-                    'critical' => [
-                        'count' => $stationBatteries->where('soc', '<', 10)->count(),
-                        'charging' => $stationBatteries->where('soc', '<', 10)->where('work_status_code', '1')->count()
-                    ]
-                ],
-                'compteurs' => $compteurs
-            ];
+        return [
+            'nom' => $station->nom_agence,
+            'ville' => $station->ville ?? 'Douala',
+            'latitude' => $station->latitude,
+            'longitude' => $station->longitude,
+            'batteries_total' => $stationBatteries->count(),
+            'batteries_en_charge' => $stationBatteries->where('work_status_code', '1')->count(),
+            'energy' => $station->energy,
+            'levels' => $levels,
+            'compteurs' => $compteurs,
+        ];
+    });
+}
+
+    private function getStationsForMap($agences)
+    {
+        return $agences
+            ->filter(fn($a) => $a->latitude && $a->longitude)
+            ->values()
+            ->map(fn($a) => [
+                'nom' => $a->nom_agence,
+                'latitude' => $a->latitude,
+                'longitude' => $a->longitude,
+            ]);
+    }
+
+    private function getBatteryLocations()
+    {
+        return Cache::remember('batteries_with_location', 60, function () {
+            return BMSData::select('mac_id', 'latitude', 'longitude')
+                ->whereNotNull('latitude')
+                ->whereNotNull('longitude')
+                ->orderByDesc('timestamp')
+                ->get()
+                ->unique('mac_id')
+                ->values()
+                ->map(fn($item) => [
+                    'mac_id' => $item->mac_id,
+                    'latitude' => $item->latitude,
+                    'longitude' => $item->longitude,
+                ]);
         });
     }
 
-    private function getStationsForMap()
-    {
-        return Agence::whereNotNull('latitude')
-            ->whereNotNull('longitude')
-            ->get(['nom_agence as nom', 'latitude', 'longitude']);
-    }
-
-  private function getBatteryLocations()
-{
-    return BMSData::select('mac_id', 'latitude', 'longitude')
-        ->whereNotNull('latitude')
-        ->whereNotNull('longitude')
-        ->orderByDesc('timestamp')
-        ->get()
-        ->map(function ($item) {
-            return [
-                'mac_id' => $item->mac_id,
-                'latitude' => $item->longitude,
-                'longitude' => $item->latitude,
-            ];
-        })
-        ->unique('mac_id')
-        ->values();
-}
-
     private function getChauffeursCount()
     {
-        return AssociationUserMoto::count();
+        return Cache::remember('chauffeurs_count', 3600, function () {
+            return AssociationUserMoto::count();
+        });
     }
 
     private function getMonthlySwapCount()
     {
-        return Swap::whereMonth('created_at', now()->month)->whereYear('created_at', now()->year)->count();
+        return Cache::remember('monthly_swap_count', 30, function () {
+            return Swap::whereMonth('created_at', now()->month)
+                ->whereYear('created_at', now()->year)
+                ->count();
+        });
     }
 
     private function getTotalDistance()
     {
-        return (int) DailyDistance::sum('total_distance_km');
+        return Cache::remember('dashboard_total_distance', 3600, function () {
+            return (int) DailyDistance::sum('total_distance_km');
+        });
     }
 
-
-
-
-      private function getMotosMapData()
+    private function getMotosMapData()
     {
-        try {
-            return Cache::remember('motos_map_data', 120, function () {
-                $motos = MotosValide::all();
-                $result = [];
+        return Cache::remember('motos_map_data', 120, function () {
+            $motos = MotosValide::all();
 
-                foreach ($motos as $moto) {
-                    $last = GpsLocation::where('macid', $moto->gps_imei)->latest('server_time')->first();
-                    if (!$last || !$last->latitude || !$last->longitude) continue;
+            $locations = GpsLocation::select(DB::raw('DISTINCT macid, latitude, longitude, server_time'))
+                ->whereNotNull('latitude')
+                ->whereNotNull('longitude')
+                ->orderBy('macid')
+                ->orderByDesc('server_time')
+                ->get()
+                ->keyBy('macid');
 
-                    $association = AssociationUserMoto::where('moto_valide_id', $moto->id)->latest()->first();
-                    $driver = $association && $association->validatedUser ? $association->validatedUser : null;
+            $result = [];
 
-                    $result[] = [
-                        'vin' => $moto->vin,
-                        'macid' => $moto->gps_imei,
-                        'driverInfo' => $driver ? $driver->nom . ' ' . $driver->prenom . ' - ' . $driver->phone : 'Non associé',
-                        'driverName' => $driver ? $driver->nom . ' ' . $driver->prenom : null,
-                        'latitude' => (float) $last->latitude,
-                        'longitude' => (float) $last->longitude,
-                        'lastUpdate' => $last->server_time,
-                        'batteryLevel' => $last->battery_level ?? null,
-                    ];
+            foreach ($motos as $moto) {
+                $last = $locations->get($moto->gps_imei);
+                if (!$last) {
+                    continue;
                 }
 
-                return $result;
-            });
-        } catch (Exception $e) {
-            Log::error("Erreur récupération motos: " . $e->getMessage());
-            return [];
-        }
+                $association = AssociationUserMoto::where('moto_valide_id', $moto->id)->latest()->first();
+                $driver = $association && $association->validatedUser ? $association->validatedUser : null;
+
+                $result[] = [
+                    'vin' => $moto->vin,
+                    'macid' => $moto->gps_imei,
+                    'driverInfo' => $driver
+                        ? $driver->nom . ' ' . $driver->prenom . ' - ' . $driver->phone
+                        : 'Non associé',
+                    'driverName' => $driver ? $driver->nom . ' ' . $driver->prenom : null,
+                    'latitude' => (float) $last->latitude,
+                    'longitude' => (float) $last->longitude,
+                    'lastUpdate' => $last->server_time,
+                    'batteryLevel' => $last->battery_level ?? null,
+                ];
+            }
+
+            return $result;
+        });
     }
-
-
-//mettre a jour les donnée sur le front_end
-   public function getFullDashboardData()
-{
-    try {
-        $batteries = $this->getAllBatteryBmsData(BatteriesValide::all());
-
-        return response()->json([
-            'summaryStats' => $this->getSummaryStats($batteries),
-            'levelStats' => $this->getLevelStats($batteries),
-            'stationStats' => $this->getStationStats($batteries),
-            'stations' => $this->getStationsWithBatteryDetails($batteries), // ✅ Ajouté pour la sidebar
-            'chauffeursCount' => $this->getChauffeursCount(),
-            'monthlySwapCount' => $this->getMonthlySwapCount(),
-            'totalDistance' => $this->getTotalDistance(),
-            'stationsMap' => $this->getStationsForMap(),
-            'batteriesWithLocation' => $this->getBatteryLocations(),
-            'motosWithLocation' => $this->getMotosMapData(),
-            'timestamp' => now()->toISOString() // ✅ Pour le debug
-        ]);
-    } catch (\Throwable $e) {
-        Log::error("Erreur dashboard JSON : " . $e->getMessage());
-        return response()->json(['error' => 'Erreur serveur'], 500);
-    }
-}
-
 }
