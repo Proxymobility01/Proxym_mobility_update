@@ -241,7 +241,7 @@ public function fullDataJson()
             'critical' => [0, 9],
         ]);
 
-        $latestReading = Cache::remember("station_reading_$stationId", 5, function () use ($stationId) {
+        $latestReading = Cache::remember("station_reading_$stationId", 10, function () use ($stationId) {
             return PowerReading::where('agence_id', $stationId)->latest()->first();
         });
 
