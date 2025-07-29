@@ -1563,6 +1563,31 @@ td {
 }
 </style>
 <div class="main-content">
+
+<!-- Onglets de navigation -->
+<div class="nav-tabs mb-4 d-flex flex-wrap gap-2">
+    <div class="nav-tab {{ Request::is('batteries/soe') ? 'active' : '' }}"
+         data-tab="soe"
+         data-url="{{ route('batterie.soe') }}"
+         onclick="window.location.href=this.dataset.url">
+        🔋 SOE des Batteries
+    </div>
+
+    <div class="nav-tab {{ Request::is('etat-batteries') ? 'active' : '' }}"
+         data-tab="etat"
+         data-url="{{ route('etat-batteries.index') }}"
+         onclick="window.location.href=this.dataset.url">
+        ⏱️ État Batteries (5min)
+    </div>
+
+    <div class="nav-tab {{ Request::is('swaps/statistiques-par-heure') ? 'active' : '' }}"
+         data-tab="swaps"
+         data-url="{{ route('swaps.par.heure') }}"
+         onclick="window.location.href=this.dataset.url">
+        📊 Swaps par Heure
+    </div>
+</div>
+
     <h2>📊 Analyse SOE des batteries (SOC à 100%)</h2>
 
     <form method="GET" action="{{ route('batterie.soe') }}" class="mb-4">

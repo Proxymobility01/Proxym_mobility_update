@@ -211,6 +211,32 @@
     </div>
 
     <div class="redmi-watermark">Flotte Batteries, Motos, Stations</div>
+
+
+<script src="https://js.pusher.com/7.2/pusher.min.js"></script>
+<script>
+    const pusher = new Pusher("2a9a95d8f7873f29013b", {
+        cluster: "us2",
+        encrypted: true
+    });
+
+    const channel = pusher.subscribe("dashboard-channel");
+
+    
+   channel.bind('dashboard-updated', function(e) {
+    console.log("📡 Mise à jour reçue :", e); // e doit contenir les clés comme summaryStats, levelStats, etc.
+
+    if (e && e.summaryStats) {
+        updateStatsUI(e); // ok ✅
+    } else {
+        console.warn("❌ Données manquantes dans le broadcast :", e);
+    }
+});
+
+</script>
+
+
+
 <script>
 
 
@@ -457,7 +483,7 @@ updateTime();
 
 /* ==============================
     FETCH AND UPDATE DASHBOARD
-============================== */
+============================== 
 
 function fetchAndUpdateDashboard() {
     fetch('/dashboard/full-data')
@@ -486,6 +512,8 @@ document.addEventListener('DOMContentLoaded', function () {
         console.log('🔄 Mise à jour automatique activée (10s)');
     }, 5000);
 });
+
+*/
 
 /* ==============================
     UPDATE UI FUNCTIONS
@@ -678,7 +706,12 @@ if (type === 'cut') {
 </script>
 
 
-<script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBn88TP5X-xaRCYo5gYxvGnVy_0WYotZWo&callback=initMap" async defer></script>
+<script
+  async
+  defer
+  src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBn88TP5X-xaRCYo5gYxvGnVy_0WYotZWo&callback=initMap">
+</script>
+
 
 </body>
 </html>

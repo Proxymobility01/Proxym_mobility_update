@@ -22,8 +22,10 @@ use App\Http\Controllers\Batteries\BatteryStationController;
 use App\Http\Controllers\Compteur\CompteurController;
 use App\Http\Controllers\DailyDistanceController;
 use App\Http\Controllers\Dashboard\DisplayDashboardController;
-
+use App\Http\Controllers\Swaps\SwapParHeureController;
 use App\Http\Controllers\Batteries\BatterieSOEController;
+use App\Http\Controllers\Batteries\EtatBatterieAssociation5MinController;
+
 
 
 Route::get('/', function () {
@@ -235,9 +237,20 @@ Route::get('/batteries/station/stats', [BatteryStationController::class, 'getSta
 
 
 
-
+// SOE des batteries à 100%
 Route::get('/batteries/soe', [BatterieSOEController::class, 'showSoeAtFullCharge'])->name('batterie.soe');
 });
+
+
+// routes etat des batteries toutes les 5 minutes avec leurs associations
+Route::get('/etat-batterie/enregistrer', [\App\Http\Controllers\Batteries\EtatBatterieAssociation5MinController::class, 'enregistrer']);
+Route::get('/etat-batteries', [EtatBatterieAssociation5MinController::class, 'index'])->name('etat-batteries.index');
+
+
+// routes pour le nombre de swap chaque heure
+Route::get('/swaps/statistiques-par-heure', [SwapParHeureController::class, 'index'])->name('swaps.par.heure');
+Route::get('/api/swaps/statistiques-par-heure', [SwapParHeureController::class, 'api'])->name('swaps.par.heure.api');
+
 
 
 require __DIR__.'/auth.php';

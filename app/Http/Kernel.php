@@ -56,4 +56,6 @@ class Kernel extends HttpKernel
         // ➕ TON MIDDLEWARE PERSONNALISÉ
         'check.employe' => \App\Http\Middleware\CheckEmployeSession::class,
     ];
+
+
 }

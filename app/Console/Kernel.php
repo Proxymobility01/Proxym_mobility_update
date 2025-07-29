@@ -13,6 +13,18 @@ class Kernel extends ConsoleKernel
     protected $commands = [
         \App\Console\Commands\CalculateDailyDistances::class,
 
+         // Ajoute la commande que nous avons créée
+       \App\Console\Commands\RefreshDashboardCache::class,
+
+    
+        \App\Console\Commands\UpdateMotosCache::class,
+        \App\Console\Commands\UpdateDailyDistances::class,
+        \App\Console\Commands\BroadcastDashboard::class,
+
+
+    \App\Console\Commands\MotosCheckZone::class,
+    // ... autres commandes
+
 
     ];
 
@@ -21,6 +33,7 @@ class Kernel extends ConsoleKernel
         'check.employe' => \App\Http\Middleware\CheckEmployeSession::class,
         // ... autres middlewares
     ];
+
     
 
     /**
@@ -28,8 +41,19 @@ class Kernel extends ConsoleKernel
      */
     protected function schedule(Schedule $schedule)
     {
+        // Planifie la commande pour s'exécuter toutes les heures
+        $schedule->command('dashboard:refresh-cache')->everyFiveMinutes();
         // Schedule the daily distance calculation at 23:55
         $schedule->command('calculate:daily-distances')->dailyAt('23:55');
+
+        
+        $schedule->command('motos:update-cache')->everyMinute()->withoutOverlapping();
+        $schedule->command('motos:update-distances')->everyTenMinutes()->withoutOverlapping();
+
+
+        // Planifie la commande
+        $schedule->command('motos:check-zone')->everyMinute();
+
     }
 
     /**

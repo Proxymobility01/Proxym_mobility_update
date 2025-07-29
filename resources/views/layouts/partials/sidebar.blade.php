@@ -58,7 +58,7 @@
             <span>Gestion des Leases</span>
         </div>
     </a>
-    <a href="#">
+    <a href="{{ route('batterie.soe') }}">
         <div class="nav-item">
             <i class="fas fa-chart-line"></i>
             <span>Rapports</span>
