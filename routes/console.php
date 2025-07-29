@@ -63,7 +63,7 @@ Schedule::call(function () {
 // cron pour le SOE des batteries chaque jour
 Schedule::call(function () {
     app(BatterieSOEController::class)->storeDailySoe();
-})->everyMinute();
+})->hourly();
 
 
 
@@ -71,4 +71,22 @@ Schedule::call(function () {
    // ✅ Bon : en utilisant Schedule directement
 Schedule::call(function () {
     app(EtatBatterieAssociation5MinController::class)->enregistrer();
-})->everyMinute();
+})->everyFiveMinutes();
+
+
+// cron job pour le cache des motos 
+Schedule::call(function () {
+    app(LocalisationController::class)->updateCacheMotosEtZones();
+})->everyFiveMinutes();
+
+// cron job pour les distances parcouru par chauffeur
+Schedule::call(function () {
+    app(DailyDistanceController::class)->updateDailyDistances();
+})->everyTenMinutes();
+
+
+// cron job derniere positions des moto
+//Schedule::call(function () {
+    app(LocalisationController::class)->updateCacheMotosEtZones();
+//})->everyMinute();
+
