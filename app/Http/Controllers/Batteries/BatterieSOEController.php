@@ -47,62 +47,82 @@ class BatterieSOEController extends Controller
      */
    public function storeDailySoe()
 {
-    $now = Carbon::now();
+    $now = \Carbon\Carbon::now();
+    \Log::info("🕑 [CRON SOE] START storeDailySoe");
 
-    Log::info("🕑 [CRON SOE] Lancement du stockage SOE pour toutes les dates historiques...");
+    // 1) Récup liste des batteries (mac_id)
+    $macIds = \App\Models\BatteriesValide::pluck('mac_id')
+        ->filter()         // enlève null/vides
+        ->unique()
+        ->values()
+        ->toArray();
 
-    $macIds = BatteriesValide::pluck('mac_id')->filter()->unique()->toArray();
+    $expected = count($macIds);
+    \Log::info("[SOE] macIds: expected={$expected}");
 
-    if (empty($macIds)) {
-        Log::warning('[CRON SOE] Aucun mac_id trouvé dans batteries_valides.');
+    if ($expected === 0) {
+        \Log::warning('[SOE] Aucun mac_id trouvé dans batteries_valides.');
         return;
     }
 
-    // Étape 1 : récupérer les enregistrements déjà existants pour éviter les doublons
-    $existing = DB::table('soe_batteries')
-        ->select('mac_id', 'date')
-        ->get()
-        ->map(function ($row) {
-            return $row->mac_id . '_' . $row->date;
-        })
-        ->toArray();
+    $found = 0; $inserts = 0; $updates = 0; $missing = [];
 
-    // Étape 2 : extraire les SOE des jours où SOC = 100% pour toutes les batteries
-    $results = DB::table('historique_bms_data_actuel')
-        ->select(
-            'mac_id',
-            DB::raw("MIN(JSON_UNQUOTE(JSON_EXTRACT(state, '$.SOC'))) as soc"),
-            DB::raw("MIN(JSON_UNQUOTE(JSON_EXTRACT(state, '$.SYLA'))) as soe"),
-            DB::raw("DATE(timestamp) as date"),
-            DB::raw("MIN(timestamp) as first_seen")
-        )
-        ->whereIn('mac_id', $macIds)
-        ->whereRaw("JSON_EXTRACT(state, '$.SOC') = '100'")
-        ->groupBy(DB::raw('mac_id, DATE(timestamp)'))
-        ->get();
+    \DB::transaction(function () use ($macIds, $now, &$found, &$inserts, &$updates, &$missing) {
+        foreach ($macIds as $mac) {
+            // 2) Dernier enregistrement SOC=100% pour CE mac_id
+            $row = \DB::table('historique_bms_data_actuel')
+                ->where('mac_id', $mac)
+                ->whereRaw("CAST(JSON_UNQUOTE(JSON_EXTRACT(state, '$.SOC')) AS UNSIGNED) = 100")
+                ->orderByDesc('timestamp')
+                ->selectRaw("
+                    ? as mac_id,
+                    JSON_UNQUOTE(JSON_EXTRACT(state, '$.SOC'))  as soc,
+                    JSON_UNQUOTE(JSON_EXTRACT(state, '$.SYLA')) as soe,
+                    DATE(`timestamp`)                           as date,
+                    `timestamp`                                 as first_seen
+                ", [$mac])
+                ->first();
 
-    $inserted = 0;
+            if (!$row) {
+                $missing[] = $mac;
+                continue;
+            }
 
-    foreach ($results as $record) {
-        $uniqueKey = $record->mac_id . '_' . $record->date;
+            $found++;
 
-        if (in_array($uniqueKey, $existing)) {
-            continue; // déjà enregistré → on ignore
+            // 3) Upsert par (mac_id, date) – respecte ta contrainte unique
+            $key = [
+                'mac_id' => $mac,
+                'date'   => $row->date,
+            ];
+
+            $payload = [
+                'soc'        => is_null($row->soc) ? null : (int) $row->soc,
+                'soe'        => is_null($row->soe) ? null : (float) $row->soe,
+                'first_seen' => $row->first_seen,
+                'updated_at' => $now,
+            ];
+
+            $exists = \DB::table('soe_batteries')->where($key)->exists();
+
+            \DB::table('soe_batteries')->updateOrInsert(
+                $key,
+                $exists ? $payload : array_merge($payload, ['created_at' => $now])
+            );
+
+            $exists ? $updates++ : $inserts++;
         }
+    });
 
-        DB::table('soe_batteries')->insert([
-            'mac_id' => $record->mac_id,
-            'soc' => $record->soc,
-            'soe' => $record->soe,
-            'date' => $record->date,
-            'first_seen' => $record->first_seen,
-            'created_at' => $now,
-            'updated_at' => $now,
-        ]);
-        $inserted++;
+    $missCount = count($missing);
+    \Log::info("[SOE] found(last SOC=100)={$found}");
+    \Log::info("[SOE] coverage: expected={$expected} | found={$found} | missing={$missCount}");
+    if ($missCount > 0) {
+        \Log::warning("[SOE] missing_mac_ids=" . implode(',', $missing));
     }
-
-    Log::info("✅ [CRON SOE] $inserted nouveaux enregistrements insérés dans soe_batteries.");
+    \Log::info("[SOE] UPSERT: inserts={$inserts} | updates={$updates}");
+    \Log::info("✅ [CRON SOE] END storeDailySoe");
 }
+
 
 }

@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Swaps;
 
 use App\Http\Controllers\Controller;
 use App\Models\Swap;
+use App\Models\Agence;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -13,8 +14,9 @@ class SwapParHeureController extends Controller
 {
     public function index()
     {
-        Log::info('🔍 Chargement de la vue des swaps par heure');
-        return view('swaps.statistiques_par_heure');
+        Log::info('📊 Chargement de la vue des swaps par heure et agence');
+        $agences = Agence::orderBy('nom_agence')->get();
+        return view('swaps.statistiques_par_heure', compact('agences'));
     }
 
     public function api(Request $request)
@@ -24,7 +26,7 @@ class SwapParHeureController extends Controller
         $start = $request->input('start');
         $end = $request->input('end');
 
-        Log::info("📡 [API SWAPS] Requête AJAX période: $periode");
+        Log::info("📡 [API SWAPS] Période: $periode");
 
         switch ($periode) {
             case 'week':
@@ -53,28 +55,28 @@ class SwapParHeureController extends Controller
                 break;
         }
 
-        Log::info("⏰ Période analysée : $from ➡️ $to");
+        Log::info("⏰ Période : $from ➡️ $to");
 
-        $swapsParHeure = Swap::select(
-                DB::raw('HOUR(swap_date) as heure'),
-                DB::raw('COUNT(*) as total')
-            )
-            ->whereBetween('swap_date', [$from, $to])
-            ->groupBy(DB::raw('HOUR(swap_date)'))
-            ->orderBy('heure')
-            ->pluck('total', 'heure');
+        $agences = Agence::orderBy('nom_agence')->get();
+        $data = [];
 
-        $resultats = [];
-        for ($i = 0; $i < 24; $i++) {
-            $resultats[] = [
-                'heure' => sprintf('%02d:00', $i),
-                'total' => $swapsParHeure[$i] ?? 0
-            ];
+        for ($h = 0; $h < 24; $h++) {
+            $ligne = ['heure' => sprintf('%02d:00', $h)];
+            foreach ($agences as $agence) {
+                $count = Swap::where('id_agence', $agence->id)
+                    ->whereBetween('swap_date', [$from, $to])
+                    ->where(DB::raw('HOUR(swap_date)'), $h)
+                    ->count();
+
+                $ligne[$agence->id] = $count;
+            }
+            $data[] = $ligne;
         }
 
         return response()->json([
             'status' => 'success',
-            'data' => $resultats
+            'agences' => $agences->map(fn($a) => ['id' => $a->id, 'nom' => $a->nom_agence]),
+            'data' => $data,
         ]);
     }
 }

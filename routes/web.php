@@ -26,6 +26,10 @@ use App\Http\Controllers\Swaps\SwapParHeureController;
 use App\Http\Controllers\Batteries\BatterieSOEController;
 use App\Http\Controllers\Batteries\EtatBatterieAssociation5MinController;
 
+use App\Http\Controllers\Swaps\EtatProprietaireBatterieController;
+use App\Http\Controllers\Notifications\NotificationController;
+
+
 
 
 Route::get('/', function () {
@@ -239,8 +243,17 @@ Route::get('/batteries/station/stats', [BatteryStationController::class, 'getSta
 
 // SOE des batteries à 100%
 Route::get('/batteries/soe', [BatterieSOEController::class, 'showSoeAtFullCharge'])->name('batterie.soe');
-});
 
+
+
+// route pour afficher les notifications 
+Route::get('/notifications', [NotificationController::class, 'index'])
+    ->name('notifications.index');
+
+// Raccourci permanent vers "Aujourd'hui"
+Route::get('/notifications/today', function () {
+    return redirect()->route('notifications.index', ['scope' => 'today']);
+})->name('notifications.today');
 
 // routes etat des batteries toutes les 5 minutes avec leurs associations
 Route::get('/etat-batterie/enregistrer', [\App\Http\Controllers\Batteries\EtatBatterieAssociation5MinController::class, 'enregistrer']);
@@ -252,5 +265,21 @@ Route::get('/swaps/statistiques-par-heure', [SwapParHeureController::class, 'ind
 Route::get('/api/swaps/statistiques-par-heure', [SwapParHeureController::class, 'api'])->name('swaps.par.heure.api');
 
 
+// propiretaire  batterie  taleaux logistique
+Route::get('/swaps/etat-batteries-proprietaire', [EtatProprietaireBatterieController::class, 'index'])
+    ->name('swaps.etat_batteries_proprietaire');
+
+});
 
 require __DIR__.'/auth.php';
+
+
+// route pour afficher les notifications 
+// route pour afficher les notifications
+Route::get('/notifications', [NotificationController::class, 'index'])
+    ->name('notifications.index');
+
+// Raccourci permanent vers "Aujourd'hui"
+Route::get('/notifications/today', function () {
+    return redirect()->route('notifications.index', ['scope' => 'today']);
+})->name('notifications.today');

@@ -63,15 +63,15 @@ Schedule::call(function () {
 // cron pour le SOE des batteries chaque jour
 Schedule::call(function () {
     app(BatterieSOEController::class)->storeDailySoe();
-})->hourly();
+})->everyMinute();
 
 
 
 // cron etat des batteries toutes les 5 minutes avec leurs associations
    // ✅ Bon : en utilisant Schedule directement
-Schedule::call(function () {
-    app(EtatBatterieAssociation5MinController::class)->enregistrer();
-})->everyFiveMinutes();
+//Schedule::call(function () {
+ //   app(EtatBatterieAssociation5MinController::class)->enregistrer();
+//})->everyFiveMinutes();
 
 
 // cron job pour le cache des motos 

@@ -3,72 +3,106 @@
 namespace App\Http\Controllers\Batteries;
 
 use App\Http\Controllers\Controller;
-use App\Models\EtatBatterieAssociation5Min;
-use App\Models\BatteriesValide;
-use App\Models\BMSData;
-use App\Models\BatteryMotoUserAssociation;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Cache;
-use App\Models\ValidatedUser;
+use App\Models\BatteriesValide;
+use Carbon\Carbon;
 
 class EtatBatterieAssociation5MinController extends Controller
 {
-
-
-    public function index()
+    private function roundToNearestFiveMinutes($timestamp)
     {
-        $etats = EtatBatterieAssociation5Min::with('user')->orderByDesc('captured_at')->paginate(20);
-        return view('batteries.etat_batteries', compact('etats'));
+        $carbon = Carbon::parse($timestamp);
+        $minute = (int) $carbon->format('i');
+        $remainder = $minute % 5;
+        return $carbon->subMinutes($remainder)->format('Y-m-d H:i:00');
     }
 
-    public function enregistrer()
+    public function index(Request $request)
     {
-        Log::info('⏱️ Début du scan des batteries (5 min)');
+        Log::info('📊 Début génération du tableau SOC');
 
-        $batteries = BatteriesValide::all();
-        $count = 0;
+        // 🎯 Détermination de la période
+        $periode = $request->input('periode', 'today');
+        $start = now()->startOfDay();
+        $end = now()->endOfDay();
 
-        foreach ($batteries as $battery) {
-            $macId = $battery->mac_id;
-
-            // 🔌 Récupération du dernier état BMS
-            $bms = Cache::remember("battery_bms_{$macId}", 60, function () use ($macId) {
-                return BMSData::where('mac_id', $macId)->orderByDesc('timestamp')->first();
-            });
-
-            $soc = optional(json_decode($bms->state ?? '{}'))->SOC ?? null;
-
-            // 🔗 Récupération de la dernière association batterie → utilisateur
-            $association = BatteryMotoUserAssociation::where('battery_id', $battery->id)
-                ->whereHas('association', function ($query) {
-                    $query->whereNull('deleted_at');
-                })
-                ->with('association.validatedUser')
-                ->latest('created_at')
-                ->first();
-
-            $user = $association?->association?->validatedUser;
-            $userId = $user?->id;
-            $userName = $user ? $user->nom . ' ' . $user->prenom : 'Non associé';
-
-            // 📝 Log
-            Log::info("🔋 Batterie {$macId} | SOC: " . ($soc ?? 'N/A') . "% | Utilisateur: {$userName}");
-
-            // 💾 Enregistrement
-            EtatBatterieAssociation5Min::create([
-                'mac_id' => $macId,
-                'soc' => $soc,
-                'user_id' => $userId,
-                'captured_at' => now(),
-            ]);
-
-            $count++;
+        if ($periode === 'custom') {
+            $date = $request->input('date');
+            $start = Carbon::parse($date)->startOfDay();
+            $end = Carbon::parse($date)->endOfDay();
+        } elseif ($periode === 'week') {
+            $start = now()->startOfWeek();
+            $end = now()->endOfWeek();
+        } elseif ($periode === 'month') {
+            $start = now()->startOfMonth();
+            $end = now()->endOfMonth();
+        } elseif ($periode === 'year') {
+            $start = now()->startOfYear();
+            $end = now()->endOfYear();
+        } elseif ($periode === 'range') {
+            $start = Carbon::parse($request->input('start'));
+            $end = Carbon::parse($request->input('end'))->endOfDay();
         }
 
-        Log::info("✅ Enregistrement terminé pour {$count} batteries.");
-        return response()->json([
-            'status' => 'ok',
-            'message' => "Enregistrement effectué pour {$count} batteries.",
+        Log::info("📅 Période sélectionnée : de $start à $end");
+
+        // 🔋 Liste des batteries valides
+        $batteries = BatteriesValide::pluck('mac_id')->toArray();
+        Log::info("🔋 Nombre de batteries valides : " . count($batteries));
+
+        // 🕐 Création des créneaux horaires de 5 minutes
+        $timeSlots = [];
+        $current = $start->copy();
+        while ($current <= $end) {
+            $timeSlots[] = $current->format('Y-m-d H:i:00');
+            $current->addMinutes(5);
+        }
+
+        // 📦 Initialisation du tableau final
+        $data = [];
+        foreach ($batteries as $macId) {
+            foreach ($timeSlots as $time) {
+                $data[$macId][$time] = null;
+            }
+        }
+
+        // 📥 Lecture des SOC depuis la table, extraction directe JSON
+        $rows = DB::table('historique_bms_data_actuel')
+            ->select(
+                'mac_id',
+                'timestamp',
+                DB::raw("JSON_UNQUOTE(JSON_EXTRACT(state, '$.SOC')) as soc")
+            )
+            ->whereIn('mac_id', $batteries)
+            ->whereBetween('timestamp', [$start, $end])
+            ->orderBy('timestamp')
+            ->get();
+
+        Log::info("📥 Nombre d'enregistrements BMS lus : " . count($rows));
+
+        foreach ($rows as $row) {
+            $timeKey = $this->roundToNearestFiveMinutes($row->timestamp);
+            $mac = $row->mac_id;
+            $soc = is_numeric($row->soc) ? (int) $row->soc : null;
+
+            if ($soc !== null) {
+                $data[$mac][$timeKey] = $soc;
+                Log::debug("✅ MAC: $mac | Heure: $timeKey | SOC: $soc");
+            } else {
+                Log::debug("❌ SOC non numérique pour MAC: $mac à $timeKey");
+            }
+        }
+
+        Log::info('✅ Fin du traitement. Envoi des données à la vue.');
+
+        return view('batteries.etat_batteries', [
+            'data' => $data,
+            'timeSlots' => $timeSlots,
+            'periode' => $periode,
+            'start' => $start->format('Y-m-d'),
+            'end' => $end->format('Y-m-d'),
         ]);
     }
 }

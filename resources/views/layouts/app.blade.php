@@ -25,6 +25,7 @@
     <div class="main">
         <!-- Inclure l'en-tête -->
         @include('layouts.partials.sidebar')
+        @include('layouts.navigation')
         
         <!-- Le contenu spécifique de chaque page sera injecté ici -->
         @yield('content')
