@@ -13,10 +13,15 @@ class AssociationUserMoto extends Model
     protected $table = 'association_user_motos';
 
     // Indiquer que les colonnes validated_user_id et moto_valide_id sont "fillable"
-    protected $fillable = ['validated_user_id', 'moto_valide_id'];
+    protected $fillable = ['validated_user_id', 'moto_valide_id','swap_bloque'];
 
     // Ajouter SoftDeletes pour gérer les suppressions logiques
     protected $dates = ['deleted_at'];
+    
+
+    protected $casts = [
+        'swap_bloque' => 'boolean',
+    ];
 
     /**
      * Définir la relation avec le modèle ValidatedUser

@@ -443,7 +443,7 @@ tr:hover {
     cursor: pointer;
     border-bottom: 2px solid transparent;
     margin-right: 10px;
-    
+
 }
 
 .nav-tab:hover {
@@ -455,6 +455,78 @@ tr:hover {
     font-weight: bold;
 }
 
+
+
+
+
+/* === Bouton SWAP (trois états) === */
+:root {
+    --swap-on-bg: #22c55e;
+    /* vert */
+    --swap-off-bg: #ef4444;
+    /* rouge */
+    --swap-wait-bg: var(--primary);
+    /* jaune #DCDB32 */
+    --swap-text-dark: var(--secondary);
+    --swap-text-light: #ffffff;
+}
+
+.btn-swap {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 12px;
+    border-radius: 6px;
+    border: none;
+    font-weight: 600;
+    transition: transform .05s ease, box-shadow .15s ease, filter .15s ease;
+}
+
+.btn-swap i {
+    font-size: 14px;
+}
+
+.btn-swap.on {
+    background: var(--swap-on-bg);
+    color: var(--swap-text-light);
+}
+
+.btn-swap.on:hover {
+    filter: brightness(0.95);
+}
+
+.btn-swap.off {
+    background: var(--swap-off-bg);
+    color: var(--swap-text-light);
+}
+
+.btn-swap.off:hover {
+    filter: brightness(0.95);
+}
+
+.btn-swap.pending {
+    background: var(--swap-wait-bg);
+    color: var(--swap-text-dark);
+    cursor: wait;
+}
+
+.btn-swap:focus {
+    box-shadow: 0 0 0 3px rgba(34, 197, 94, .25);
+    outline: none;
+}
+
+.btn-swap.off:focus {
+    box-shadow: 0 0 0 3px rgba(239, 68, 68, .25);
+}
+
+.btn-swap.pending:focus {
+    box-shadow: 0 0 0 3px rgba(220, 219, 50, .25);
+}
+
+/* micro feedback */
+.btn-swap:active {
+    transform: translateY(1px);
+}
 </style>
 
 @section('content')
@@ -465,26 +537,23 @@ tr:hover {
         <div id="date" class="date"></div>
     </div>
 
-<!-- Onglets de navigation -->
-<div class="nav-tabs">
-    <div class="nav-tab {{ Request::is('associations') || (Request::is('associations/*') && !Request::is('associations/batteries*')) ? 'active' : '' }}"
-         data-tab="moto-user"
-         data-url="{{ route('associations.index') }}">
-        Associations Moto-Utilisateur
-    </div>
+    <!-- Onglets de navigation -->
+    <div class="nav-tabs">
+        <div class="nav-tab {{ Request::is('associations') || (Request::is('associations/*') && !Request::is('associations/batteries*')) ? 'active' : '' }}"
+            data-tab="moto-user" data-url="{{ route('associations.index') }}">
+            Associations Moto-Utilisateur
+        </div>
 
-    <div class="nav-tab {{ Request::is('associations/batteries*') ? 'active' : '' }}"
-         data-tab="battery-user"
-         data-url="{{ route('associations.batteries.index') }}">
-        Associations Batterie-Utilisateur
-    </div>
+        <div class="nav-tab {{ Request::is('associations/batteries*') ? 'active' : '' }}" data-tab="battery-user"
+            data-url="{{ route('associations.batteries.index') }}">
+            Associations Batterie-Utilisateur
+        </div>
 
-    <div class="nav-tab {{ Request::is('ravitaillements') || Request::is('ravitaillements/*') ? 'active' : '' }}"
-         data-tab="ravitaillement"
-         data-url="{{ route('ravitailler.batteries.index') }}">
-        Ravitailler Une Station
+        <div class="nav-tab {{ Request::is('ravitaillements') || Request::is('ravitaillements/*') ? 'active' : '' }}"
+            data-tab="ravitaillement" data-url="{{ route('ravitailler.batteries.index') }}">
+            Ravitailler Une Station
+        </div>
     </div>
-</div>
 
 
     <!-- Barre de recherche et ajout -->
@@ -572,6 +641,21 @@ tr:hover {
                         <button class="action-btn delete-association" title="Supprimer l'association">
                             <i class="fas fa-trash"></i>
                         </button>
+                        <button class="btn-swap {{ $association->swap_bloque ? 'on' : 'off' }}"
+                            data-assoc-id="{{ $association->id }}"
+                            aria-pressed="{{ $association->swap_bloque ? 'true' : 'false' }}"
+                            title="{{ $association->swap_bloque ? 'Swap autorisé' : 'Swap coupé' }}"
+                            onclick="toggleSwap(this)">
+                            <i class="fas {{ $association->swap_bloque ? 'fa-unlock' : 'fa-lock' }}"></i>
+                            <span class="label">{{ $association->swap_bloque ? 'SWAP ON' : 'SWAP OFF' }}</span>
+                        </button>
+                        <button class="btn-swap pending" data-moto-id="{{ $association->motosValide->id }}"
+                            title="Lecture de l’état moteur…" onclick="toggleEngine(this)">
+                            <i class="fas fa-spinner fa-spin"></i>
+                            <span class="label">...</span>
+                        </button>
+
+
                     </td>
                 </tr>
                 @endforeach
@@ -1100,11 +1184,11 @@ document.addEventListener('DOMContentLoaded', function() {
     initCheckboxEvents();
 
     // Ajoutez ce code dans la section "Attachement des événements" de votre premier fichier (paste.txt)
-// À placer juste après l'initialisation des événements des checkboxes
+    // À placer juste après l'initialisation des événements des checkboxes
 
-// Événements pour les onglets
-document.querySelectorAll('.nav-tab').forEach(tab => {
-        tab.addEventListener('click', function () {
+    // Événements pour les onglets
+    document.querySelectorAll('.nav-tab').forEach(tab => {
+        tab.addEventListener('click', function() {
             const url = this.getAttribute('data-url');
             if (url) {
                 window.location.href = url;
@@ -1114,10 +1198,135 @@ document.querySelectorAll('.nav-tab').forEach(tab => {
 
 
 });
-
-
-
-
-   
 </script>
+
+
+
+
+<script>
+function setSwapButtonState(btn, state) {
+    // state ∈ {1, 0, 'pending'}
+    btn.classList.remove('on', 'off', 'pending');
+
+    if (state === 'pending') {
+        btn.classList.add('pending');
+        btn.setAttribute('aria-busy', 'true');
+        btn.title = 'Changement en cours...';
+        btn.querySelector('i').className = 'fas fa-spinner fa-spin';
+        btn.querySelector('.label').textContent = '...';
+        return;
+    }
+
+    btn.removeAttribute('aria-busy');
+    if (state === 1) {
+        btn.classList.add('on');
+        btn.setAttribute('aria-pressed', 'true');
+        btn.title = 'Swap autorisé';
+        btn.querySelector('i').className = 'fas fa-unlock';
+        btn.querySelector('.label').textContent = 'SWAP ON';
+    } else {
+        btn.classList.add('off');
+        btn.setAttribute('aria-pressed', 'false');
+        btn.title = 'Swap coupé';
+        btn.querySelector('i').className = 'fas fa-lock';
+        btn.querySelector('.label').textContent = 'SWAP OFF';
+    }
+}
+
+async function toggleSwap(btn) {
+    const id = btn.getAttribute('data-assoc-id');
+    setSwapButtonState(btn, 'pending');
+
+    try {
+        const res = await fetch(
+            `{{ route('associations.toggleSwap', ['id' => 'ID_PLACEHOLDER']) }}`
+            .replace('ID_PLACEHOLDER', id), {
+                method: 'POST',
+                headers: {
+                    'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                    'Accept': 'application/json'
+                }
+            }
+        );
+
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        const state = await res.json(); // 1 = ON, 0 = OFF
+        setSwapButtonState(btn, state);
+    } catch (e) {
+        console.error(e);
+        // Revenir à OFF par sécurité visuelle
+        setSwapButtonState(btn, 0);
+        alert('Erreur lors du changement d’état du SWAP');
+    }
+}
+</script>
+
+
+<script>
+function setEngineBtn(btn, state) {
+  btn.classList.remove('on','off','pending');
+  if (state === 'pending') {
+    btn.classList.add('pending');
+    btn.querySelector('i').className = 'fas fa-spinner fa-spin';
+    btn.querySelector('.label').textContent = '...';
+    btn.title = 'Lecture/Action en cours...';
+    return;
+  }
+  if (state === 1) {
+    btn.classList.add('on');
+    btn.querySelector('i').className = 'fas fa-unlock';
+    btn.querySelector('.label').textContent = 'ENGINE ON';
+    btn.title = 'Moteur autorisé';
+  } else {
+    btn.classList.add('off');
+    btn.querySelector('i').className = 'fas fa-lock';
+    btn.querySelector('.label').textContent = 'ENGINE OFF';
+    btn.title = 'Moteur coupé';
+  }
+}
+
+async function refreshEngineState(btn) {
+  const motoId = btn.getAttribute('data-moto-id');
+  setEngineBtn(btn, 'pending');
+  try {
+    const res = await fetch(`{{ route('motos.engine.state', ['id' => 'ID']) }}`.replace('ID', motoId), {
+      headers: { 'Accept': 'application/json' }
+    });
+    if (!res.ok) throw new Error('HTTP '+res.status);
+    const state = await res.json(); // 1 = ON, 0 = OFF
+    setEngineBtn(btn, state);
+  } catch (e) {
+    console.error(e);
+    setEngineBtn(btn, 0);
+  }
+}
+
+async function toggleEngine(btn) {
+  const motoId = btn.getAttribute('data-moto-id');
+  setEngineBtn(btn, 'pending');
+  try {
+    const res = await fetch(`{{ route('motos.engine.toggle', ['id' => 'ID']) }}`.replace('ID', motoId), {
+      method: 'POST',
+      headers: {
+        'X-CSRF-TOKEN': '{{ csrf_token() }}',
+        'Accept': 'application/json'
+      }
+    });
+    if (!res.ok) throw new Error('HTTP '+res.status);
+    // Re-lire l'état réel après un court délai (exécution device asynchrone)
+    setTimeout(() => refreshEngineState(btn), 2000);
+  } catch (e) {
+    console.error(e);
+    setEngineBtn(btn, 1); // fallback visuel
+    alert("Erreur lors de l'envoi de l'ordre au traceur");
+  }
+}
+
+// Au chargement: initialiser tous les boutons moteur
+document.addEventListener('DOMContentLoaded', () => {
+  document.querySelectorAll('button.btn-swap[data-moto-id]').forEach(refreshEngineState);
+});
+</script>
+
+
 @endsection

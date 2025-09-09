@@ -28,6 +28,7 @@ use App\Http\Controllers\Batteries\EtatBatterieAssociation5MinController;
 
 use App\Http\Controllers\Swaps\EtatProprietaireBatterieController;
 use App\Http\Controllers\Notifications\NotificationController;
+use App\Http\Controllers\Motos\CommandMotoController;
 
 
 
@@ -274,6 +275,29 @@ Route::get('/api/swaps/statistiques-par-heure', [SwapParHeureController::class, 
 Route::get('/swaps/etat-batteries-proprietaire', [EtatProprietaireBatterieController::class, 'index'])
     ->name('swaps.etat_batteries_proprietaire');
 
+
+
+
+
+    //coupure du swap 
+    Route::post('/associations/{id}/swap/toggle', [AssociationUserMotoController::class, 'toggleSwap'])
+    ->name('associations.toggleSwap');
+
+
+
+
+    // route pour les coupure de motos
+Route::prefix('motos')->middleware('auth')->group(function () {
+    Route::get('{id}/engine/state',  [CommandMotoController::class, 'state'])->name('motos.engine.state');
+    Route::post('{id}/engine/toggle',[CommandMotoController::class, 'toggle'])->name('motos.engine.toggle');
+    Route::patch('{id}/engine',      [CommandMotoController::class, 'set'])->name('motos.engine.set');
+
+    // Diagnostics
+    Route::get('diag/login', [CommandMotoController::class, 'probeLogin']);
+    Route::get('diag/fleet', [CommandMotoController::class, 'probeFleet']);
+});
+
+
 });
 
 require __DIR__.'/auth.php';
@@ -288,3 +312,6 @@ Route::get('/notifications', [NotificationController::class, 'index'])
 Route::get('/notifications/today', function () {
     return redirect()->route('notifications.index', ['scope' => 'today']);
 })->name('notifications.today');
+
+
+
