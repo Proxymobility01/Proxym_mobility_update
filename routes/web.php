@@ -50,14 +50,14 @@ Route::middleware('auth')->group(function () {
 
 
 
-    
+
 // Routes du Dashboard
 Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard.index');
 Route::get('/dashboard/filter', [DashboardController::class, 'filter'])->name('dashboard.filter');
 Route::get('/dashboard/inactive-batteries', [DashboardController::class, 'getInactiveBatteries'])->name('dashboard.inactive-batteries');
    Route::get('/', [DashboardController::class, 'index'])->name('dashboard');
 
-   
+
 // compteur
 Route::get('/compteur/test', [CompteurController::class, 'index'])->name('compteur.index');
 Route::post('/compteur/envoyer', [CompteurController::class, 'envoyerMessage'])->name('compteur.envoyer');
@@ -75,7 +75,7 @@ Route::prefix('api')->group(function () {
 
 
 
- 
+
     // Motos
     Route::prefix('motos')->name('motos.')->group(function () {
         Route::get('/', [MotoController::class, 'index'])->name('index');
@@ -104,11 +104,11 @@ Route::prefix('api')->group(function () {
     });
 
     // BMS
-    Route::get('bms-details', [BMSController::class, 'index'])->name('bms.index');
+    Route::get('bms-details', [BmsSetupController::class, 'index'])->name('bms.index');
     Route::prefix('api/bms')->group(function () {
-        Route::get('batteries', [BMSController::class, 'getBatteries']);
-        Route::get('battery/{mac_id}', [BMSController::class, 'getBatteryDetails']);
-        Route::get('battery/{mac_id}/refresh', [BMSController::class, 'refreshBatteryData']);
+        Route::get('batteries', [BmsSetupController::class, 'getBatteries']);
+        Route::get('battery/{mac_id}', [BmsSetupController::class, 'getBatteryDetails']);
+        Route::get('battery/{mac_id}/refresh', [BmsSetupController::class, 'refreshBatteryData']);
     });
 
     // Associations moto-utilisateur
@@ -186,11 +186,11 @@ Route::prefix('api')->group(function () {
 
       // Route principale pour afficher la page des swaps par chauffeur
       Route::get('/swaps-chauffeur', [App\Http\Controllers\Associations\SwapChauffeurController::class, 'index'])->name('swaps.chauffeur.index');
-    
+
       // Routes API pour le filtrage et les statistiques des swaps par chauffeur
       Route::post('/api/swaps-chauffeur/filter', [App\Http\Controllers\Associations\SwapChauffeurController::class, 'filterSwaps'])->name('api.swaps.chauffeur.filter');
       Route::post('/api/swaps-chauffeur/stats', [App\Http\Controllers\Associations\SwapChauffeurController::class, 'getStats'])->name('api.swaps.chauffeur.stats');
-      
+
 
     // Ravitaillements
     Route::prefix('ravitaillements')->group(function () {
@@ -202,9 +202,14 @@ Route::prefix('api')->group(function () {
         Route::post('/ravitaillements/stats', [RavitaillementController::class, 'getStats']);
     });
 
-    // BMS Setup
-    Route::get('/bms/setup', [BmsSetupController::class, 'index'])->name('bms.setup');
+//bms confirgurations
+
+
+    Route::get('/bms/configure', [BmsSetupController::class, 'configure'])->name('bms.configure');
+    Route::post('/bms/preview', [BmsSetupController::class, 'preview'])->name('bms.preview');
+    Route::get('/bms/preview', fn() => redirect()->route('bms.configure'));
     Route::post('/bms/send', [BmsSetupController::class, 'send'])->name('bms.send');
+    Route::get('/bms/configs', [BmsSetupController::class, 'configs'])->name('bms.configs');
 
     // GPS
     Route::prefix('gps')->group(function () {
@@ -246,7 +251,7 @@ Route::get('/batteries/soe', [BatterieSOEController::class, 'showSoeAtFullCharge
 
 
 
-// route pour afficher les notifications 
+// route pour afficher les notifications
 Route::get('/notifications', [NotificationController::class, 'index'])
     ->name('notifications.index');
 
@@ -274,7 +279,7 @@ Route::get('/swaps/etat-batteries-proprietaire', [EtatProprietaireBatterieContro
 require __DIR__.'/auth.php';
 
 
-// route pour afficher les notifications 
+// route pour afficher les notifications
 // route pour afficher les notifications
 Route::get('/notifications', [NotificationController::class, 'index'])
     ->name('notifications.index');
