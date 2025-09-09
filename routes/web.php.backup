@@ -25,7 +25,7 @@ use App\Http\Controllers\Dashboard\DisplayDashboardController;
 use App\Http\Controllers\Swaps\SwapParHeureController;
 use App\Http\Controllers\Batteries\BatterieSOEController;
 use App\Http\Controllers\Batteries\EtatBatterieAssociation5MinController;
-use App\Http\Controllers\power_reading\PowerReadingController;
+
 use App\Http\Controllers\Swaps\EtatProprietaireBatterieController;
 use App\Http\Controllers\Notifications\NotificationController;
 use App\Http\Controllers\Motos\CommandMotoController;
@@ -279,18 +279,10 @@ Route::get('/swaps/etat-batteries-proprietaire', [EtatProprietaireBatterieContro
 
 
 
-    //coupure du swap
+    //coupure du swap 
     Route::post('/associations/{id}/swap/toggle', [AssociationUserMotoController::class, 'toggleSwap'])
     ->name('associations.toggleSwap');
 
-
-    //power Reading
-
-
-
-    Route::get('/power-readings', [PowerReadingController::class, 'index'])->name('power_readings.index');
-    Route::get('/power-readings/export/excel', [PowerReadingController::class, 'exportExcel'])->name('power_readings.export.excel');
-    Route::get('/power-readings/export/pdf', [PowerReadingController::class, 'exportPdf'])->name('power_readings.export.pdf');
 
 
 

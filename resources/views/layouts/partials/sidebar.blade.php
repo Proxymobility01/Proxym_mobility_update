@@ -70,6 +70,13 @@
             <span>Gestion des Entitées</span>
         </div>
     </a>
+    <a href="{{ route('power_readings.index') }}">
+        <div class="nav-item">
+            <i class="fas fa-bolt"></i>
+            <span>Power Readings</span>
+        </div>
+    </a>
+
     <a href="{{ route('employe.index') }}">
         <div class="nav-item">
             <i class="fas fa-users"></i>
@@ -89,5 +96,5 @@
     </form>
 </div>
 
-   
+
 </div>
