@@ -374,4 +374,19 @@ class AssociationUserMotoController extends Controller
             'message' => $exists ? 'Cet utilisateur est déjà associé à cette moto' : 'Cet utilisateur n\'est pas encore associé à cette moto'
         ]);
     }
+
+
+
+//coupure du swap
+    public function toggleSwap(Request $request, int $id)
+{
+    // Renvoie 0/1 (0 = couper, 1 = rallumer) pour consumption par le JS
+    return DB::transaction(function () use ($id) {
+        $assoc = AssociationUserMoto::lockForUpdate()->findOrFail($id);
+        $assoc->swap_bloque = ! $assoc->swap_bloque; // inverse l’état
+        $assoc->save();
+
+        return response()->json((int) $assoc->swap_bloque, 200);
+    });
+}
 }

@@ -87,6 +87,6 @@ Schedule::call(function () {
 
 // cron job derniere positions des moto
 //Schedule::call(function () {
-    app(LocalisationController::class)->updateCacheMotosEtZones();
+   // app(LocalisationController::class)->updateCacheMotosEtZones();
 //})->everyMinute();
 
